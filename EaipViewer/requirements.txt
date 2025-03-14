@@ -1,0 +1,5 @@
+requests>=2.25.1
+Pillow>=8.0.0
+pycryptodome>=3.10.1
+configparser>=5.0.2
+urllib3>=1.26.5
