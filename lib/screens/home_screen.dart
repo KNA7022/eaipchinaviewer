@@ -24,11 +24,23 @@ class _HomeScreenState extends State<HomeScreen> {
   String _currentVersion = '';
   List<EaipVersion> _versions = [];
 
+  // 添加搜索相关的状态变量
+  final List<AipItem> _filteredItems = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
     _loadVersions();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadVersions() async {
@@ -74,6 +86,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _aipItems.clear();
           _aipItems.addAll(sortedItems);
+          _searchController.clear();
+          _searchQuery = '';
+          _isSearching = false;
+          _filteredItems.clear();
         });
       } else {
         final authService = AuthService();
@@ -96,6 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoading = true;
       _selectedPdfUrl = null;  // 清空当前选中的PDF
       _selectedTitle = null;
+      _searchController.clear();
+      _searchQuery = '';
+      _isSearching = false;
+      _filteredItems.clear();
     });
     
     try {
@@ -184,6 +204,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
     recursiveSort(processedItems);
     return processedItems;
+  }
+
+  // 添加搜索方法
+  void _handleSearch(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      _isSearching = _searchQuery.isNotEmpty;
+      _filteredItems.clear();
+      
+      if (_isSearching) {
+        // 递归搜索函数
+        void searchInItems(List<AipItem> items) {
+          for (var item in items) {
+            if (item.nameCn.toLowerCase().contains(_searchQuery)) {
+              _filteredItems.add(item);
+            }
+            if (item.children.isNotEmpty) {
+              searchInItems(item.children);
+            }
+          }
+        }
+        
+        searchInItems(_aipItems);
+      }
+    });
   }
 
   Widget _buildListItem(BuildContext context, AipItem item) {
@@ -428,14 +473,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
-              decoration: const InputDecoration(
+              controller: _searchController,
+              decoration: InputDecoration(
                 hintText: '搜索...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _isSearching
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _handleSearch('');
+                        },
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
               ),
-              onChanged: (value) {
-                // TODO: 实现搜索功能
-              },
+              onChanged: _handleSearch,
             ),
           ),
           // 文档列表
@@ -443,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
-                    children: _aipItems
+                    children: (_isSearching ? _filteredItems : _aipItems)
                         .map((item) => _buildListItem(context, item))
                         .toList(),
                   ),
