@@ -154,7 +154,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<AipItem> _sortAndProcessItems(List<AipItem> items) {
-    List<AipItem> sortedItems = List.from(items); // 创建副本以避免修改原始列表
+    // 先构建层级关系
+    final processedItems = AipItem.buildHierarchy(items);
+    
+    // 添加调试输出
+    for (var item in processedItems) {
+      if (item.nameCn.startsWith('ENR')) {
+        print('顶级项: ${item.nameCn}');
+        for (var child in item.children) {
+          print('  子项: ${child.nameCn}');
+          for (var grandChild in child.children) {
+            print('    孙项: ${grandChild.nameCn}');
+          }
+        }
+      }
+    }
     
     void recursiveSort(List<AipItem> items) {
       // 先对当前层级的项目进行排序
@@ -163,53 +177,98 @@ class _HomeScreenState extends State<HomeScreen> {
       // 对每个项目的子项进行递归排序
       for (var item in items) {
         if (item.children.isNotEmpty) {
-          List<AipItem> sortedChildren = List.from(item.children);
-          recursiveSort(sortedChildren);
-          item.children.clear();
-          item.children.addAll(sortedChildren);
+          recursiveSort(item.children);
         }
       }
     }
 
-    recursiveSort(sortedItems);
-    return sortedItems;
+    recursiveSort(processedItems);
+    return processedItems;
   }
 
-  Widget _buildListItem(BuildContext context, int index) {
-    final item = _aipItems[index];
-    
+  Widget _buildListItem(BuildContext context, AipItem item) {
     // 如果是空项，不显示
     if (item.nameCn.isEmpty && item.children.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    // 调试输出
+    if (item.nameCn.startsWith('ENR')) {
+      print('构建项: ${item.nameCn}, 子项数量: ${item.children.length}');
+    }
     
-    return ExpansionTile(
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
+    // 如果有子项，创建可展开的项（注意：空列表也被认为是空）
+    if (item.children.isNotEmpty) {
+      final validChildren = item.children
+          .where((child) => child.nameCn.isNotEmpty)
+          .toList();
+          
+      print('有效子项数量: ${validChildren.length}');
+
+      if (validChildren.isNotEmpty) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+          ),
+          child: ExpansionTile(
+            key: PageStorageKey<String>(item.nameCn),
+            initiallyExpanded: false,
+            controlAffinity: ListTileControlAffinity.leading,
+            trailing: item.pdfPath?.isNotEmpty == true
+                ? IconButton(
+                    icon: Icon(
+                      Icons.picture_as_pdf,
+                      color: _selectedPdfUrl == item.pdfPath 
+                          ? Theme.of(context).primaryColor 
+                          : Colors.grey,
+                    ),
+                    onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
+                    tooltip: '查看PDF',
+                  )
+                : null,
+            title: Text(
               item.nameCn,
               style: TextStyle(
                 color: item.isModified == 'Y' ? Colors.red : null,
                 fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
               ),
             ),
+            expandedAlignment: Alignment.centerLeft,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
+            iconColor: Colors.grey,
+            collapsedIconColor: Colors.grey,
+            children: validChildren
+                .map((child) => Padding(
+                      padding: const EdgeInsets.only(left: 20.0),
+                      child: _buildListItem(context, child),
+                    ))
+                .toList(),
           ),
-          if (item.pdfPath?.isNotEmpty == true)
-            IconButton(
+        );
+      }
+    }
+    
+    // 如果没有有效子项，创建普通列表项
+    return ListTile(
+      title: Text(
+        item.nameCn,
+        style: TextStyle(
+          color: item.isModified == 'Y' ? Colors.red : null,
+          fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
+        ),
+      ),
+      trailing: item.pdfPath?.isNotEmpty == true
+          ? IconButton(
               icon: Icon(
                 Icons.picture_as_pdf,
-                color: _selectedPdfUrl == item.pdfPath ? Theme.of(context).primaryColor : Colors.grey,
+                color: _selectedPdfUrl == item.pdfPath 
+                    ? Theme.of(context).primaryColor 
+                    : Colors.grey,
               ),
               onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
               tooltip: '查看PDF',
-            ),
-        ],
-      ),
-      children: item.children
-          .where((child) => child.nameCn.isNotEmpty || child.children.isNotEmpty)
-          .map((child) => _buildListItem(context, _aipItems.indexOf(child)))
-          .toList(),
+            )
+          : null,
     );
   }
 
@@ -327,9 +386,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    itemCount: _aipItems.length,
-                    itemBuilder: (context, index) => _buildListItem(context, index),
+                : ListView(
+                    children: _aipItems
+                        .map((item) => _buildListItem(context, item))
+                        .toList(),
                   ),
           ),
         ],

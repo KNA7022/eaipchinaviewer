@@ -301,8 +301,6 @@ class ApiService {
           if (parts[1] == "Data") {
             final String relativePath = parts.sublist(3).join('/');
             //print('构建PDF URL - 相对路径: $relativePath');
-            print('$basePath');
-            print('$version');
             return '$baseUrl/$basePath/$version/$relativePath';
           }
           
