@@ -212,7 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: ExpansionTile(
             key: PageStorageKey<String>(item.nameCn),
-            initiallyExpanded: false,
+            initiallyExpanded: false,  // 确保初始状态为折叠
+            maintainState: false,      // 不保持展开状态
             controlAffinity: ListTileControlAffinity.leading,
             trailing: item.pdfPath?.isNotEmpty == true
                 ? IconButton(
