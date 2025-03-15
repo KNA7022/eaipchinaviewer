@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   http: ^1.1.2
   shared_preferences: ^2.2.2
-  path_provider: ^2.1.2  # 已有
+  path_provider: ^2.1.1  # 已有
   webview_windows: ^0.3.0  # 添加 Windows Webview 支持
   crypto: ^3.0.3
   pointycastle: ^3.7.4

@@ -63,7 +63,11 @@ class _LoginScreenState extends State<LoginScreen> {
         await api.initializeWithAuth(token, userUuid);
         
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/home');
+          // 清除导航堆栈并跳转到主页
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/home',
+            (Route<dynamic> route) => false,
+          );
         }
       } else {
         setState(() {

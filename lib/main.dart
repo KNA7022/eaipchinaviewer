@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';  // 添加这个导入
+import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/settings_screen.dart';  // 添加这一行
 import 'services/auth_service.dart';
 
 void main() async {
@@ -66,10 +67,16 @@ class MainApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      initialRoute: isLoggedIn ? '/home' : '/login',
+      home: isLoggedIn ? const HomeScreen() : const LoginScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/settings': (context) => const SettingsScreen(),
+      },
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
+        );
       },
     );
   }
