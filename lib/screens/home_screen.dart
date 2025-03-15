@@ -230,7 +230,8 @@ class _HomeScreenState extends State<HomeScreen> {
             title: Text(
               item.nameCn,
               style: TextStyle(
-                color: item.isModified == 'Y' ? Colors.red : null,
+                // 使用 hasModifiedChildren 来决定颜色
+                color: item.hasModifiedChildren ? Colors.red : null,
                 fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
               ),
             ),
@@ -254,7 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
       title: Text(
         item.nameCn,
         style: TextStyle(
-          color: item.isModified == 'Y' ? Colors.red : null,
+          // 使用 hasModifiedChildren 来决定颜色
+          color: item.hasModifiedChildren ? Colors.red : null,
           fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
         ),
       ),

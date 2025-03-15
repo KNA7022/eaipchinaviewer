@@ -217,13 +217,14 @@ class AipItem {
       (item) => airportCodeRegex.matchAsPrefix(item.nameCn)?.end == item.nameCn.length
     ).toList();
 
-    // 创建机场父项（使用实际存在的父项信息）
+    // 创建机场父项
     for (final parentItem in airportParentItems) {
       final code = parentItem.airportCode!;
       airportMap[code] = parentItem.copyWith(
         children: [],
         pdfPath: parentItem.pdfPath,
-        isModified: parentItem.isModified
+        // 父项的修改状态设为 'N'，后续通过子项状态动态判断
+        isModified: 'N',
       );
     }
 
@@ -232,7 +233,6 @@ class AipItem {
       final code = item.airportCode;
       if (code == null) continue;
 
-      // 自动创建缺失的父项（使用代码作为名称）
       if (!airportMap.containsKey(code)) {
         airportMap[code] = AipItem(
           nameCn: code,
@@ -242,10 +242,9 @@ class AipItem {
         );
       }
 
-      // 添加子项（排除父项自身）
       if (item.nameCn != code) {
         airportMap[code] = airportMap[code]!.copyWith(
-          children: [...airportMap[code]!.children, item]
+          children: [...airportMap[code]!.children, item],
         );
       }
     }
@@ -303,6 +302,11 @@ static List<int> _getEnrSectionNumbers(String nameCn) {
       children: children ?? List.from(this.children),
       pdfPath: pdfPath ?? this.pdfPath,
     );
+  }
+
+  // 添加计算修改状态的 getter
+  bool get hasModifiedChildren {
+    return isModified == 'Y' || children.any((child) => child.hasModifiedChildren);
   }
 }
 
