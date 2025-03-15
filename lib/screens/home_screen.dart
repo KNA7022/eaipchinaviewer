@@ -65,14 +65,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic>? data = await api.getCurrentAipStructure();
       
       if (data != null) {
+        // 创建项目列表并立即排序
+        final items = data
+            .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final sortedItems = _sortAndProcessItems(items);
+        
         setState(() {
           _aipItems.clear();
-          _aipItems.addAll(
-            data.map((item) => AipItem.fromJson(item as Map<String, dynamic>)).toList(),
-          );
+          _aipItems.addAll(sortedItems);
         });
       } else {
-        // 添加登录状态检查和跳转
         final authService = AuthService();
         await authService.clearAuthData();
         if (mounted) {
@@ -100,11 +103,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic>? data = await api.getAipStructureForVersion(version);
       
       if (data != null) {
+        final items = data.map((item) => 
+          AipItem.fromJson(item as Map<String, dynamic>)
+        ).toList();
+        
+        // 对所有项目进行递归排序
+        final sortedItems = _sortAndProcessItems(items);
+        
         setState(() {
           _aipItems.clear();
-          _aipItems.addAll(
-            data.map((item) => AipItem.fromJson(item as Map<String, dynamic>)).toList(),
-          );
+          _aipItems.addAll(sortedItems);
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -146,39 +154,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<AipItem> _sortAndProcessItems(List<AipItem> items) {
-    // 递归排序函数
-    void sortChildren(List<AipItem> items) {
-      // 排序规则：先按类型分组，再按编号排序
-      items.sort((a, b) {
-        // 提取编号部分
-        final aNum = _extractNumber(a.nameCn);
-        final bNum = _extractNumber(b.nameCn);
-        if (aNum != null && bNum != null) {
-          return aNum.compareTo(bNum);
-        }
-        return a.nameCn.compareTo(b.nameCn);
-      });
-
-      // 递归处理子项
+    List<AipItem> sortedItems = List.from(items); // 创建副本以避免修改原始列表
+    
+    void recursiveSort(List<AipItem> items) {
+      // 先对当前层级的项目进行排序
+      items.sort((a, b) => a.compareTo(b));
+      
+      // 对每个项目的子项进行递归排序
       for (var item in items) {
         if (item.children.isNotEmpty) {
-          sortChildren(item.children);
+          List<AipItem> sortedChildren = List.from(item.children);
+          recursiveSort(sortedChildren);
+          item.children.clear();
+          item.children.addAll(sortedChildren);
         }
       }
     }
 
-    sortChildren(items);
-    return items;
+    recursiveSort(sortedItems);
+    return sortedItems;
   }
 
-  // 从文本中提取编号
-  num? _extractNumber(String text) {
-    final regex = RegExp(r'(\d+(\.\d+)*)');
-    final match = regex.firstMatch(text);
-    if (match != null) {
-      return num.tryParse(match.group(1)!);
+  Widget _buildListItem(BuildContext context, int index) {
+    final item = _aipItems[index];
+    
+    // 如果是空项，不显示
+    if (item.nameCn.isEmpty && item.children.isEmpty) {
+      return const SizedBox.shrink();
     }
-    return null;
+    
+    return ExpansionTile(
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.nameCn,
+              style: TextStyle(
+                color: item.isModified == 'Y' ? Colors.red : null,
+                fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
+              ),
+            ),
+          ),
+          if (item.pdfPath?.isNotEmpty == true)
+            IconButton(
+              icon: Icon(
+                Icons.picture_as_pdf,
+                color: _selectedPdfUrl == item.pdfPath ? Theme.of(context).primaryColor : Colors.grey,
+              ),
+              onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
+              tooltip: '查看PDF',
+            ),
+        ],
+      ),
+      children: item.children
+          .where((child) => child.nameCn.isNotEmpty || child.children.isNotEmpty)
+          .map((child) => _buildListItem(context, _aipItems.indexOf(child)))
+          .toList(),
+    );
   }
 
   @override
@@ -248,15 +280,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Row(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _isDrawerOpen ? _drawerWidth : 0,
-            child: _buildDrawer(),
-          ),
+          // 左侧抽屉
+          if (_isDrawerOpen)
+            SizedBox(
+              width: _drawerWidth,
+              child: _buildDrawer(),
+            ),
+          // 抽屉开关按钮
           IconButton(
             icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
             onPressed: () => setState(() => _isDrawerOpen = !_isDrawerOpen),
           ),
+          // 右侧主内容区
           Expanded(
             child: _selectedPdfUrl != null
                 ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
@@ -268,10 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDrawer() {
-    if (!_isDrawerOpen) return const SizedBox();
-    
     return Container(
-      width: _drawerWidth,
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: Colors.grey.shade300)),
       ),
@@ -297,34 +329,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
                     itemCount: _aipItems.length,
-                    itemBuilder: _buildListItem,
+                    itemBuilder: (context, index) => _buildListItem(context, index),
                   ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildListItem(BuildContext context, int index) {
-    final item = _aipItems[index];
-    return ExpansionTile(
-      title: Text(
-        item.nameCn,
-        style: TextStyle(
-          color: item.isModified == 'Y' ? Colors.red : null,
-          fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
-        ),
-      ),
-      children: [
-        if (item.pdfPath?.isNotEmpty == true)
-          ListTile(
-            leading: const Icon(Icons.picture_as_pdf),
-            title: const Text('查看PDF'),
-            selected: _selectedPdfUrl == item.pdfPath,
-            onTap: () => _handlePdfSelect(item.pdfPath, item.nameCn),  // 修改这里
-          ),
-        ...item.children.map((child) => _buildListItem(context, _aipItems.indexOf(child))).toList(),
-      ],
     );
   }
 }
