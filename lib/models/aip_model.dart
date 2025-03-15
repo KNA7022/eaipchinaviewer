@@ -15,20 +15,6 @@ class AipItem {
     this.pdfPath,
   }) : children = children ?? [];
 
-  AipItem copyWith({
-    String? nameCn,
-    String? isModified,
-    List<AipItem>? children,
-    String? pdfPath,
-  }) {
-    return AipItem(
-      nameCn: nameCn ?? this.nameCn,
-      isModified: isModified ?? this.isModified,
-      children: children ?? List.from(this.children),
-      pdfPath: pdfPath ?? this.pdfPath,
-    );
-  }
-
 
   factory AipItem.fromJson(Map<String, dynamic> json, {List<String> parentPath = const []}) {
     if (!_shouldKeepItem(json['name_cn'], parentPath)) {
@@ -141,61 +127,89 @@ class AipItem {
   }
 
   static List<AipItem> buildHierarchy(List<AipItem> items) {
-    final enrMap = <String, AipItem>{};
-    final airportMap = <String, AipItem>{};
-    final result = <AipItem>[];
+    final Map<String, AipItem> enrMap = {};
+    final Map<String, AipItem> airportMap = {};
+    final List<AipItem> result = [];
     final processedItems = HashSet<AipItem>();
 
-    // 分离ENR和机场项
-    final enrItems = items.where((item) {
-      if (item.nameCn.startsWith('ENR')) {
-        processedItems.add(item);
-        return true;
-      }
-      return false;
-    }).toList();
+    // 分离 ENR 和机场项
+    final enrItems = items.where((item) => item.nameCn.startsWith('ENR')).toList();
+    final airportItems = items.where((item) => 
+      RegExp(r'Z[PBGHLSUWY][A-Z]{2}').hasMatch(item.nameCn)
+    ).toList();
+    
+    // 将所有已处理的项添加到 processedItems
+    processedItems.addAll(enrItems);
+    processedItems.addAll(airportItems);
 
-    final airportItems = items.where((item) {
-      if (item.airportCode != null) {
-        processedItems.add(item);
-        return true;
-      }
-      return false;
-    }).toList();
-
-    // 处理ENR层级
+    // 按章节号深度和数值排序
     enrItems.sort((a, b) {
-      final aNums = _getEnrSectionNumbers(a.nameCn);
-      final bNums = _getEnrSectionNumbers(b.nameCn);
-      for (int i = 0; i < aNums.length && i < bNums.length; i++) {
-        final cmp = aNums[i].compareTo(bNums[i]);
-        if (cmp != 0) return cmp;
+      final aNumbers = _getEnrSectionNumbers(a.nameCn);
+      final bNumbers = _getEnrSectionNumbers(b.nameCn);
+      
+      // 首先按层级深度排序
+      if (aNumbers.length != bNumbers.length) {
+        return aNumbers.length.compareTo(bNumbers.length);
       }
-      return aNums.length.compareTo(bNums.length);
+      
+      // 同层级按数字大小排序
+      for (var i = 0; i < aNumbers.length && i < bNumbers.length; i++) {
+        if (aNumbers[i] != bNumbers[i]) {
+          return aNumbers[i].compareTo(bNumbers[i]);
+        }
+      }
+      return 0;
     });
 
-    // 创建ENR映射
-    for (final item in enrItems) {
-      enrMap[item.nameCn] = item.copyWith(children: []);
+    print('排序后的ENR项：');
+    for (var item in enrItems) {
+      print('  ${item.nameCn}');
+      processedItems.add(item);
     }
 
-    // 建立ENR父子关系
-    for (final item in enrItems) {
+    // 创建所有 ENR 项的映射
+    for (var item in enrItems) {
+      final numbers = _getEnrSectionNumbers(item.nameCn);
+      final key = 'ENR ${numbers.join('.')}';
+      enrMap[key] = item.copyWith(children: []);
+      print('创建ENR项: $key');
+    }
+
+    // 构建父子关系
+    for (var item in enrItems) {
       final numbers = _getEnrSectionNumbers(item.nameCn);
       if (numbers.length > 1) {
         final parentNumbers = numbers.sublist(0, numbers.length - 1);
-        final parent = enrItems.firstWhere(
-          (e) => _getEnrSectionNumbers(e.nameCn).equals(parentNumbers),
-          orElse: () => AipItem(nameCn: ''),
-        );
-        parent.children.add(enrMap[item.nameCn]!);
+        final parentKey = 'ENR ${parentNumbers.join('.')}';
+        final itemKey = 'ENR ${numbers.join('.')}';
+        
+        final parent = enrMap[parentKey];
+        final child = enrMap[itemKey];
+        
+        if (parent != null && child != null) {
+          parent.children.add(child);
+          print('添加子项: $itemKey -> $parentKey (当前子项数: ${parent.children.length})');
+        } else {
+          print('无法添加子项: $itemKey, 父项${parentKey}${parent == null ? "不存在" : ""}');
+        }
       }
     }
 
-    // 添加ENR顶级项
-    result.addAll(enrItems.where((item) => 
-      _getEnrSectionNumbers(item.nameCn).length == 1));
+    // 仅添加顶级项到结果
+    for (var item in enrItems) {
+      final numbers = _getEnrSectionNumbers(item.nameCn);
+      if (numbers.length == 1) {
+        final key = 'ENR ${numbers.join('.')}';
+        final topItem = enrMap[key];
+        if (topItem != null) {
+          result.add(topItem);
+          print('添加顶级项: $key, 子项数: ${topItem.children.length}');
+          _printHierarchy(topItem, '  ');
+        }
+      }
+    }
 
+    // 处理机场项
     final airportCodeRegex = RegExp(r'^(Z[PBGHLSUWY][A-Z]{2})\b');
     
     // 第一阶段：收集所有父项信息
@@ -252,14 +266,43 @@ class AipItem {
     return result;
   }
 
+  // 添加用于打印层级结构的辅助方法
+  static void _printHierarchy(AipItem item, String indent) {
+    for (var child in item.children) {
+      print('$indent- ${child.nameCn} (子项数: ${child.children.length})');
+      _printHierarchy(child, '$indent  ');
+    }
+  }
+
   String? get airportCode {
     final match = RegExp(r'^(Z[PBGHLSUWY][A-Z]{2})\b').firstMatch(nameCn);
     return match?.group(1);
   }
 
-  static List<int> _getEnrSectionNumbers(String nameCn) {
-    final match = RegExp(r'ENR\s*(\d+(?:\.\d+)*)').firstMatch(nameCn);
+// 构建ENR名称
+String _buildEnrName(List<int> numbers) {
+  return 'ENR ${numbers.join('.')}';
+}
+
+// 增强版章节号提取方法
+static List<int> _getEnrSectionNumbers(String nameCn) {
+    final match = RegExp(r'ENR[^\d]*((\d+\.)*\d+)').firstMatch(nameCn);
     return match?.group(1)?.split('.')?.map(int.parse)?.toList() ?? [];
+  }
+
+  // 修复点3：添加静态的copyWith方法
+  AipItem copyWith({
+    String? nameCn,
+    String? isModified,
+    List<AipItem>? children,
+    String? pdfPath,
+  }) {
+    return AipItem(
+      nameCn: nameCn ?? this.nameCn,
+      isModified: isModified ?? this.isModified,
+      children: children ?? List.from(this.children),
+      pdfPath: pdfPath ?? this.pdfPath,
+    );
   }
 }
 
