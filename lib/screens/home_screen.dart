@@ -281,51 +281,100 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.calendar_today),
-            tooltip: '切换版本',
+            tooltip: '选择版本号',
             initialValue: _currentVersion,
-            onSelected: _handleVersionChange,  // 修改这里
+            onSelected: _handleVersionChange,
             itemBuilder: (context) => _versions.map((version) {
+              final bool isCurrent = version.status == 'CURRENTLY_ISSUE';
+              final bool isExpired = version.effectiveDate.isBefore(DateTime.now());
+              final bool isUpcoming = version.effectiveDate.isAfter(DateTime.now());
+              
+              final statusConfig = isCurrent
+                  ? _StatusConfig('当前版本', Colors.green)
+                  : isExpired
+                      ? _StatusConfig('已失效', Colors.grey)
+                      : isUpcoming
+                          ? _StatusConfig('即将生效', Colors.orange)
+                          : _StatusConfig('未知状态', Colors.grey);
+              
+
               return PopupMenuItem(
                 value: version.name,
                 child: Container(
+                  width: 280,
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(version.name),
-                          Text(
-                            '生效日期: ${DateFormat('yyyy-MM-dd').format(version.effectiveDate)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  version.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusConfig.color.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: statusConfig.color),
+                                  ),
+                                  child: Text(
+                                    statusConfig.text,
+                                    style: TextStyle(
+                                      color: statusConfig.color,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            // 添加生效和失效日期显示
+                            RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                                children: [
+                                  const TextSpan(text: '生效: '),
+                                  TextSpan(
+                                    text: DateFormat('yyyy-MM-dd').format(version.effectiveDate),
+                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                  const TextSpan(text: '  失效: '),
+                                  TextSpan(
+                                    text: version.deadlineDate != null 
+                                        ? DateFormat('yyyy-MM-dd').format(version.deadlineDate!)
+                                        : '${DateFormat('yyyy-MM-dd').format(version.effectiveDate.add(const Duration(days: 28)))} (预计)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontStyle: version.deadlineDate == null ? FontStyle.italic : FontStyle.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                      if (_currentVersion == version.name)
+                        Icon(
+                          Icons.check,
+                          color: statusConfig.color,
+                          size: 20,
                         ),
-                        decoration: BoxDecoration(
-                          color: version.statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: version.statusColor,
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          version.statusText,
-                          style: TextStyle(
-                            color: version.statusColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -397,4 +446,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+// 添加状态配置类
+class _StatusConfig {
+  final String text;
+  final Color color;
+  
+  const _StatusConfig(this.text, this.color);
 }
