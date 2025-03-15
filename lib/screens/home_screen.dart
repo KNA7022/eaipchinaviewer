@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   bool _isSearching = false;
 
+  // 添加搜索索引
+  final Map<String, List<AipItem>> _searchIndex = {};
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
             .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
             .toList();
         final sortedItems = _sortAndProcessItems(items);
+        
+        // 构建搜索索引
+        _buildSearchIndex(sortedItems);
         
         setState(() {
           _aipItems.clear();
@@ -206,7 +212,41 @@ class _HomeScreenState extends State<HomeScreen> {
     return processedItems;
   }
 
-  // 添加搜索方法
+  // 添加索引构建方法
+  void _buildSearchIndex(List<AipItem> items) {
+    _searchIndex.clear();
+    
+    void addToIndex(AipItem item) {
+      // 将项目名称分词（按空格和常见分隔符）
+      final words = item.nameCn.toLowerCase().split(RegExp(r'[\s\-_.,]'))
+        ..removeWhere((word) => word.isEmpty);
+      
+      // 为每个词建立索引
+      for (var word in words) {
+        _searchIndex.putIfAbsent(word, () => []).add(item);
+        
+        // 为词的前缀也建立索引（实现模糊匹配）
+        if (word.length > 2) {
+          for (var i = 2; i < word.length; i++) {
+            final prefix = word.substring(0, i);
+            _searchIndex.putIfAbsent(prefix, () => []).add(item);
+          }
+        }
+      }
+      
+      // 递归处理子项
+      for (var child in item.children) {
+        addToIndex(child);
+      }
+    }
+    
+    // 处理所有顶级项
+    for (var item in items) {
+      addToIndex(item);
+    }
+  }
+
+  // 优化搜索方法
   void _handleSearch(String query) {
     setState(() {
       _searchQuery = query.toLowerCase();
@@ -214,19 +254,38 @@ class _HomeScreenState extends State<HomeScreen> {
       _filteredItems.clear();
       
       if (_isSearching) {
-        // 递归搜索函数
-        void searchInItems(List<AipItem> items) {
-          for (var item in items) {
-            if (item.nameCn.toLowerCase().contains(_searchQuery)) {
-              _filteredItems.add(item);
+        final searchWords = _searchQuery.split(RegExp(r'\s+'))
+          ..removeWhere((word) => word.isEmpty);
+        
+        if (searchWords.isEmpty) return;
+        
+        // 使用 Set 去重
+        final resultSet = <AipItem>{};
+        
+        // 对每个搜索词进行查找
+        for (var word in searchWords) {
+          // 查找完整词匹配
+          final exactMatches = _searchIndex[word] ?? [];
+          resultSet.addAll(exactMatches);
+          
+          // 查找前缀匹配
+          _searchIndex.forEach((key, items) {
+            if (key.startsWith(word)) {
+              resultSet.addAll(items);
             }
-            if (item.children.isNotEmpty) {
-              searchInItems(item.children);
-            }
-          }
+          });
         }
         
-        searchInItems(_aipItems);
+        _filteredItems.addAll(resultSet);
+        
+        // 按相关度排序（包含更多搜索词的排在前面）
+        _filteredItems.sort((a, b) {
+          final aRelevance = searchWords.where((word) => 
+            a.nameCn.toLowerCase().contains(word)).length;
+          final bRelevance = searchWords.where((word) => 
+            b.nameCn.toLowerCase().contains(word)).length;
+          return bRelevance.compareTo(aRelevance);
+        });
       }
     });
   }
