@@ -184,6 +184,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           
           const Divider(height: 1),
           
+          // 添加保密提示部分
+          _buildSection(
+            icon: Icons.security,
+            title: '保密提示',
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Card(
+                  color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: theme.colorScheme.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '保密提示',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '保守国家秘密是我国公民的基本义务，根据《中华人民共和国保守国家秘密法》，所有国家机关、组织及公民都有此责任。',
+                          style: TextStyle(height: 1.5),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '国家秘密关乎国家安全和利益，泄露将造成重大损害。',
+                          style: TextStyle(height: 1.5),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '因此，保守国家秘密不仅是法律要求，也是公民应尽的责任，任何危害行为都将受到法律追究。',
+                          style: TextStyle(height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const Divider(height: 1),
+          
           // 关于部分
           _buildSection(
             icon: Icons.info,
