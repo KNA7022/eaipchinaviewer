@@ -534,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: '搜索...',
+                hintText: '输入关键词后按回车搜索...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _isSearching
                     ? IconButton(
@@ -547,7 +547,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
                 border: const OutlineInputBorder(),
               ),
-              onChanged: _handleSearch,
+              textInputAction: TextInputAction.search, // 设置键盘回车键为搜索
+              onSubmitted: _handleSearch, // 按下回车时触发搜索
+              onChanged: (value) {
+                // 仅更新搜索框状态，不执行搜索
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                  _isSearching = _searchQuery.isNotEmpty;
+                  if (!_isSearching) {
+                    _filteredItems.clear();
+                  }
+                });
+              },
             ),
           ),
           // 文档列表
