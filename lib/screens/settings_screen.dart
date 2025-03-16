@@ -293,11 +293,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showAboutDialog(BuildContext context) {
     showAboutDialog(
       context: context,
-      applicationName: 'AIP中国航图查看器',
+      applicationName: 'EAIP中国航图查看器',
       applicationVersion: '1.0.0',
       applicationIcon: const Icon(Icons.flight),
       children: [
-        const Text('这是一个非官方的第三方应用程序，用于查看中国民航航图。'),
+        const Text('这是一个非官方的第三方应用程序，用于查看中国民航英文航图，此版本航图不涉及国家机密，请注意甄别'),
         const SizedBox(height: 8),
         InkWell(
           onTap: () => _launchUrl('https://github.com/KNA7022/eaipchinaviewer'),
