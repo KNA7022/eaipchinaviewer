@@ -1,5 +1,5 @@
 # Project-level configuration.
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.15)
 project(eaipchinaviewer LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
@@ -61,9 +61,51 @@ endfunction()
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
+# 设置 Flutter 环境变量和路径
+set(FLUTTER_ROOT $ENV{FLUTTER_ROOT})
+set(FLUTTER_WINDOWS_ROOT "${FLUTTER_ROOT}/packages/flutter_tools/templates/app/windows.tmpl")
+set(FLUTTER_INCLUDE_DIRS
+  "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64"
+  "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64/cpp_client_wrapper/include"
+)
+
+# 编译设置
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 添加 Flutter 头文件路径
+include_directories(
+  "${FLUTTER_MANAGED_DIR}/ephemeral"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+# 确保 Flutter 依赖已准备就绪
+add_custom_target(flutter_assemble DEPENDS
+  "${FLUTTER_MANAGED_DIR}/ephemeral/libflutter_windows.dll"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_windows.dll"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_export.h"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_windows.h"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_messenger.h"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_plugin_registrar.h"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/flutter_texture_registrar.h"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/core_implementations.cc"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/standard_codec.cc"
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/plugin_registrar.cc"
+)
+
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# 复制 Flutter DLL
+install(FILES "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64/flutter_windows.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}"
+)
+
+# 复制运行时依赖
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/flutter/ephemeral/flutter_windows.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}"
+)
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.

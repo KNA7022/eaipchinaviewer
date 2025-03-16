@@ -1,7 +1,7 @@
 name: eaipchinaviewer
-description: EAIP China Viewer App
+description: EAIP China Viewer App - 中国民航航图查看器
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -27,6 +27,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1  # 添加这一行
 
 flutter:
   uses-material-design: true
@@ -42,3 +43,20 @@ flutter:
           weight: 500
         - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700
+
+# 添加图标配置
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"  # 使用PNG格式的图标
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 48
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1976D2"

@@ -87,3 +87,8 @@ local.properties
 
 # IntelliJ/Android Studio
 .idea/
+
+# Keystore files
+*.jks
+*.keystore
+key.properties
