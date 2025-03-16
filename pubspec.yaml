@@ -1,7 +1,7 @@
 name: eaipchinaviewer
 description: EAIP China Viewer App
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1  # 修改版本号，格式为 version_name+version_code
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -27,6 +27,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -42,3 +43,10 @@ flutter:
           weight: 500
         - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/icon.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/icons/icon.png"
