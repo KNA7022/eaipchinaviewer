@@ -98,49 +98,133 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('登录')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            TextFormField(
-              controller: _usernameController,
-              decoration: const InputDecoration(labelText: '用户名'),
-              validator: (value) => value?.isEmpty ?? true ? '请输入用户名' : null,
-            ),
-            TextFormField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
-              obscureText: true,
-              validator: (value) => value?.isEmpty ?? true ? '请输入密码' : null,
-            ),
-            const SizedBox(height: 20),
-            CaptchaImage(
-              onCaptchaIdGenerated: (id) => _captchaId = id,
-            ),
-            TextFormField(
-              controller: _captchaController,
-              decoration: const InputDecoration(labelText: '验证码'),
-              validator: (value) => value?.isEmpty ?? true ? '请输入验证码' : null,
-            ),
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Logo和标题
+                  const Icon(
+                    Icons.flight,
+                    size: 64,
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'EAIP中国航图查看器',
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // 登录表单
+                  Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              labelText: '用户名',
+                              prefixIcon: Icon(Icons.person),
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (value) => value?.isEmpty ?? true ? '请输入用户名' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: const InputDecoration(
+                              labelText: '密码',
+                              prefixIcon: Icon(Icons.lock),
+                              border: OutlineInputBorder(),
+                            ),
+                            obscureText: true,
+                            validator: (value) => value?.isEmpty ?? true ? '请输入密码' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _captchaController,
+                                  decoration: const InputDecoration(
+                                    labelText: '验证码',
+                                    prefixIcon: Icon(Icons.security),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) => value?.isEmpty ?? true ? '请输入验证码' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Card(
+                                elevation: 2,
+                                child: CaptchaImage(
+                                  onCaptchaIdGenerated: (id) => _captchaId = id,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _handleLogin,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary,
+                                foregroundColor: theme.colorScheme.onPrimary,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text('登 录'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // 底部版权信息
+                  const SizedBox(height: 24),
+                  Text(
+                    '© 2025 EAIP中国航图查看器',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _handleLogin,
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const Text('登录'),
             ),
-          ],
+          ),
         ),
       ),
     );
