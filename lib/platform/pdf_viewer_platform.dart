@@ -121,31 +121,49 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
                   child: const Text('重试'),
                 ),
               )
-            : PDFView(
-                filePath: _localPath!,
-                enableSwipe: true,
-                swipeHorizontal: true,
-                autoSpacing: true,
-                pageFling: true,
-                pageSnap: true,
-                defaultPage: 0,
-                fitPolicy: FitPolicy.BOTH,
-                preventLinkNavigation: false,
-                onRender: (pages) {
-                  setState(() => _totalPages = pages);
-                },
-                onError: (error) {
-                  print('PDF渲染错误: $error');
-                },
-                onPageError: (page, error) {
-                  print('第$page页加载错误: $error');
-                },
-                onViewCreated: (controller) {
-                  // PDF控制器创建成功
-                },
-                onPageChanged: (page, total) {
-                  setState(() => _currentPage = page);
-                },
+            : Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  PDFView(
+                    filePath: _localPath!,
+                    enableSwipe: true,
+                    swipeHorizontal: true,
+                    autoSpacing: true,
+                    pageFling: true,
+                    pageSnap: true,
+                    defaultPage: 0,
+                    fitPolicy: FitPolicy.BOTH,
+                    preventLinkNavigation: false,
+                    onRender: (pages) {
+                      setState(() => _totalPages = pages);
+                    },
+                    onError: (error) {
+                      print('PDF渲染错误: $error');
+                    },
+                    onPageError: (page, error) {
+                      print('第$page页加载错误: $error');
+                    },
+                    onPageChanged: (page, total) {
+                      setState(() => _currentPage = page);
+                    },
+                  ),
+                  if (!_isLoading && _localPath != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${(_currentPage ?? 0) + 1}/${_totalPages ?? 0}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                ],
               );
 
     if (!widget.showAppBar) {
