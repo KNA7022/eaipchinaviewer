@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cross_file/cross_file.dart';  // 添加这行导入
+import '../services/connectivity_service.dart';
 
 abstract class PdfViewerPlatform extends StatefulWidget {
   final String url;
@@ -78,7 +79,9 @@ class _WindowsPdfViewerState extends State<WindowsPdfViewer> {
 // 移动平台状态实现
 class _MobilePdfViewerState extends State<MobilePdfViewer> {
   final PdfService _pdfService = PdfService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   bool _isLoading = true;
+  bool _isOffline = false;
   String? _localPath;
   int? _totalPages = 0;
   int? _currentPage = 0;
@@ -86,11 +89,30 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
   @override
   void initState() {
     super.initState();
+    _setupConnectivity();
     _loadPdf();
   }
 
+  void _setupConnectivity() {
+    _connectivityService.onConnectivityChanged.listen((isOnline) {
+      setState(() => _isOffline = !isOnline);
+      if (isOnline && _localPath == null) {
+        _loadPdf();
+      }
+    });
+  }
+
   Future<void> _loadPdf() async {
-    setState(() => _isLoading = true);
+    if (!_connectivityService.isOnline) {
+      setState(() => _isOffline = true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isOffline = false;
+    });
+
     try {
       final filePath = await _pdfService.downloadAndSavePdf(
         widget.url,
@@ -210,63 +232,89 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
   }
 
   @override
+  void dispose() {
+    _connectivityService.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     Widget pdfView = _isLoading
         ? const Center(child: CircularProgressIndicator())
-        : _localPath == null
+        : _isOffline
             ? Center(
-                child: ElevatedButton(
-                  onPressed: _loadPdf,
-                  child: const Text('重试'),
-                ),
-              )
-            : GestureDetector(
-                onLongPress: _handleLongPress,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    PDFView(
-                      filePath: _localPath!,
-                      enableSwipe: true,
-                      swipeHorizontal: true,
-                      autoSpacing: true,
-                      pageFling: true,
-                      pageSnap: true,
-                      defaultPage: 0,
-                      fitPolicy: FitPolicy.BOTH,
-                      preventLinkNavigation: false,
-                      onRender: (pages) {
-                        setState(() => _totalPages = pages);
-                      },
-                      onError: (error) {
-                        print('PDF渲染错误: $error');
-                      },
-                      onPageError: (page, error) {
-                        print('第$page页加载错误: $error');
-                      },
-                      onPageChanged: (page, total) {
-                        setState(() => _currentPage = page);
-                      },
+                    const Icon(
+                      Icons.cloud_off,
+                      size: 48,
+                      color: Colors.grey,
                     ),
-                    if (!_isLoading && _localPath != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${(_currentPage ?? 0) + 1}/${_totalPages ?? 0}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
+                    const SizedBox(height: 16),
+                    const Text('无网络连接'),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: _loadPdf,
+                      child: const Text('重试'),
+                    ),
                   ],
                 ),
-              );
+              )
+            : _localPath == null
+                ? Center(
+                    child: ElevatedButton(
+                      onPressed: _loadPdf,
+                      child: const Text('重试'),
+                    ),
+                  )
+                : GestureDetector(
+                    onLongPress: _handleLongPress,
+                    child: Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        PDFView(
+                          filePath: _localPath!,
+                          enableSwipe: true,
+                          swipeHorizontal: true,
+                          autoSpacing: true,
+                          pageFling: true,
+                          pageSnap: true,
+                          defaultPage: 0,
+                          fitPolicy: FitPolicy.BOTH,
+                          preventLinkNavigation: false,
+                          onRender: (pages) {
+                            setState(() => _totalPages = pages);
+                          },
+                          onError: (error) {
+                            print('PDF渲染错误: $error');
+                          },
+                          onPageError: (page, error) {
+                            print('第$page页加载错误: $error');
+                          },
+                          onPageChanged: (page, total) {
+                            setState(() => _currentPage = page);
+                          },
+                        ),
+                        if (!_isLoading && _localPath != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                            margin: const EdgeInsets.only(bottom: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${(_currentPage ?? 0) + 1}/${_totalPages ?? 0}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
 
     if (!widget.showAppBar) {
       return pdfView;

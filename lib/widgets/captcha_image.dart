@@ -4,6 +4,7 @@ import 'dart:typed_data';  // 添加这一行
 import 'package:http/io_client.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
+import '../services/connectivity_service.dart';  // 添加这一行
 
 class CaptchaImage extends StatefulWidget {
   final Function(String) onCaptchaIdGenerated;
@@ -24,11 +25,25 @@ class _CaptchaImageState extends State<CaptchaImage> {
   String? _imageUrl;
   String? _error;
   bool _isLoading = false;
+  final ConnectivityService _connectivityService = ConnectivityService();
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
+    _setupConnectivity();
     _loadCaptcha();
+  }
+
+  void _setupConnectivity() {
+    _connectivityService.onConnectivityChanged.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+        if (isOnline && (_error != null || _imageBytes == null)) {
+          _loadCaptcha();
+        }
+      });
+    });
   }
 
   Future<http.Client> _getClient() async {
@@ -39,6 +54,14 @@ class _CaptchaImageState extends State<CaptchaImage> {
   }
 
   Future<void> _loadCaptcha() async {
+    if (_isOffline) {
+      setState(() {
+        _isLoading = false;
+        _error = 'No internet connection';
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
@@ -56,7 +79,7 @@ class _CaptchaImageState extends State<CaptchaImage> {
         // 直接使用响应的二进制数据作为图片源
         _imageBytes = response.bodyBytes;
         _imageUrl = null; // 不再使用URL直接加载
-        setState(() {});
+        setState(() => _error = null);
       } else {
         throw Exception('验证码获取失败: ${response.statusCode}');
       }
@@ -66,6 +89,12 @@ class _CaptchaImageState extends State<CaptchaImage> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _connectivityService.dispose();
+    super.dispose();
   }
 
   @override
