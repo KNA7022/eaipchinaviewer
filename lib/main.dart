@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/settings_screen.dart';  // 添加这一行
-import 'screens/weather_screen.dart';  // 添加这一行
+import 'screens/settings_screen.dart';
+import 'screens/weather_screen.dart';
 import 'services/auth_service.dart';
+import 'screens/policy_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 使用 rootBundle 预加载字体
   await _loadFonts();
   
+  final prefs = await SharedPreferences.getInstance();
+  final isFirstRun = prefs.getBool('first_run') ?? true;
   final isLoggedIn = await AuthService().isLoggedIn();
-  runApp(MainApp(isLoggedIn: isLoggedIn));
+  
+  runApp(MainApp(
+    isFirstRun: isFirstRun,
+    isLoggedIn: isLoggedIn,
+  ));
 }
 
 Future<void> _loadFonts() async {
-  // 使用 rootBundle 加载字体文件
   try {
     await rootBundle.load('assets/fonts/NotoSansSC-Regular.otf');
     await rootBundle.load('assets/fonts/NotoSansSC-Medium.otf');
@@ -28,9 +34,14 @@ Future<void> _loadFonts() async {
 }
 
 class MainApp extends StatelessWidget {
+  final bool isFirstRun;
   final bool isLoggedIn;
   
-  const MainApp({super.key, required this.isLoggedIn});
+  const MainApp({
+    super.key,
+    required this.isFirstRun,
+    required this.isLoggedIn,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +79,11 @@ class MainApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: isLoggedIn ? const HomeScreen() : const LoginScreen(),
+      home: isFirstRun 
+          ? const PolicyScreen(type: 'privacy', isFirstRun: true)
+          : isLoggedIn 
+              ? const HomeScreen() 
+              : const LoginScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),

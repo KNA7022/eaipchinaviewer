@@ -25,6 +25,7 @@ dependencies:
   share_plus: ^7.2.1
   permission_handler: ^11.0.1
   connectivity_plus: ^5.0.2
+  flutter_markdown: ^0.6.20
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +38,8 @@ flutter:
   
   assets:
     - assets/fonts/
+    - assets/privacy_policy.md
+    - assets/terms_of_service.md
 
   fonts:
     - family: NotoSansSC

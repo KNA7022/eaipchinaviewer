@@ -6,6 +6,8 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';  // 添加这个导入
+import 'package:shared_preferences/shared_preferences.dart';
+import 'policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -258,6 +260,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => _showAboutDialog(context),
               ),
             ],
+          ),
+
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip),
+            title: const Text('隐私政策'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PolicyScreen(type: 'privacy'),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: const Text('用户协议'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PolicyScreen(type: 'terms'),
+              ),
+            ),
           ),
         ],
       ),
