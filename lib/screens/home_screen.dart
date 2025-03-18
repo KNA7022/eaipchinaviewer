@@ -24,6 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedTitle;
   String _currentVersion = '';
   List<EaipVersion> _versions = [];
+  DateTime? _lastRefreshTime;
+  bool _isRefreshCooling = false;
+  static const _refreshCooldown = Duration(seconds: 15);
 
   // 添加搜索相关的状态变量
   final List<AipItem> _filteredItems = [];
@@ -73,9 +76,40 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // 添加检查刷新冷却的方法
+  bool _canRefresh() {
+    if (_lastRefreshTime == null) return true;
+    final timeSinceLastRefresh = DateTime.now().difference(_lastRefreshTime!);
+    return timeSinceLastRefresh >= _refreshCooldown;
+  }
+
+  void _startRefreshCooldown() {
+    setState(() => _isRefreshCooling = true);
+    Future.delayed(_refreshCooldown, () {
+      if (mounted) {
+        setState(() => _isRefreshCooling = false);
+      }
+    });
+  }
+
   Future<void> _loadData() async {
+    if (!_canRefresh()) {
+      final remainingTime = _refreshCooldown - DateTime.now().difference(_lastRefreshTime!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('请等待${remainingTime.inSeconds}秒后再试'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       setState(() => _isLoading = true);
+      _lastRefreshTime = DateTime.now();  // 记录刷新时间
+      _startRefreshCooldown();
       
       final api = ApiService();
       final List<dynamic>? data = await api.getCurrentAipStructure();
@@ -501,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadData,
+            onPressed: (_isLoading || !_canRefresh()) ? null : _loadData,
           ),
           IconButton(
             icon: const Icon(Icons.settings),
