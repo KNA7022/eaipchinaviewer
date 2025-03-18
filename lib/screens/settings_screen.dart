@@ -256,7 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('版本信息'),
-                subtitle: const Text('1.1.0'),
+                subtitle: const Text('1.2.0'),
                 onTap: () => _showAboutDialog(context),
               ),
             ],
@@ -374,7 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showAboutDialog(
       context: context,
       applicationName: 'EAIP中国航图查看器',
-      applicationVersion: '1.1.0',
+      applicationVersion: '1.2.0',
       applicationIcon: const Icon(Icons.flight),
       children: [
         const Text('这是一个非官方的第三方应用程序，用于查看中国民航英文航图，此版本航图不涉及国家机密，请注意甄别'),
