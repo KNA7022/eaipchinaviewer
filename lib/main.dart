@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/settings_screen.dart';  // 添加这一行
+import 'screens/weather_screen.dart';  // 添加这一行
 import 'services/auth_service.dart';
 
 void main() async {
@@ -72,6 +73,7 @@ class MainApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
         '/settings': (context) => const SettingsScreen(),
+        '/weather': (context) => const WeatherScreen(),
       },
       onUnknownRoute: (settings) {
         return MaterialPageRoute(

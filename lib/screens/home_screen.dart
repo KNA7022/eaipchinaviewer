@@ -5,6 +5,7 @@ import 'pdf_viewer_screen.dart';
 import '../services/auth_service.dart';
 import '../models/version_model.dart';  // 添加这个导入
 import 'package:intl/intl.dart';  // 添加这一行导入
+import '../screens/weather_screen.dart';  // 添加这一行
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -385,6 +386,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('航图查看器'),
         actions: [
+          // 添加天气按钮
+          IconButton(
+            icon: const Icon(Icons.wb_sunny),
+            tooltip: '机场天气',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WeatherScreen(),
+              ),
+            ),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.calendar_today),
             tooltip: '选择版本号',

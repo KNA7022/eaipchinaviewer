@@ -1,0 +1,64 @@
+curl -X 'GET' \
+  'https://aviationweather.gov/api/data/metar?ids=KMCI&format=json&taf=true' \
+  -H 'accept: */*'
+Request URL
+https://aviationweather.gov/api/data/metar?ids=KMCI&format=json&taf=true
+响应：
+[
+  {
+    "metar_id": 717338131,
+    "icaoId": "KMCI",
+    "receiptTime": "2025-03-17 11:58:19",
+    "obsTime": 1742212380,
+    "reportTime": "2025-03-17 12:00:00",
+    "temp": 7.2,
+    "dewp": -5,
+    "wdir": 190,
+    "wspd": 14,
+    "wgst": null,
+    "visib": "10+",
+    "altim": 1014,
+    "slp": 1013.7,
+    "qcField": 4,
+    "wxString": null,
+    "presTend": -1.5,
+    "maxT": 8.3,
+    "minT": 4.4,
+    "maxT24": null,
+    "minT24": null,
+    "precip": null,
+    "pcp3hr": null,
+    "pcp6hr": null,
+    "pcp24hr": null,
+    "snow": null,
+    "vertVis": null,
+    "metarType": "METAR",
+    "rawOb": "KMCI 171153Z 19014KT 10SM SCT120 07/M05 A2994 RMK AO2 SLP137 T00721050 10083 20044 56015",
+    "mostRecent": 1,
+    "lat": 39.2975,
+    "lon": -94.7309,
+    "elev": 308,
+    "prior": 1,
+    "name": "Kansas City Intl, MO, US",
+    "clouds": [
+      {
+        "cover": "SCT",
+        "base": 12000
+      }
+    ],
+    "rawTaf": "KMCI 171120Z 1712/1812 18015KT P6SM FEW200 FM171400 20019G28KT P6SM SCT250 FM180000 18013KT P6SM SCT250 FM180600 18018G27KT P6SM SCT250"
+  }
+]
+响应头：
+Response headers
+ cache-control: max-age=180 
+ content-security-policy: frame-ancestors 'self' *.weather.gov 
+ content-type: application/json 
+ date: Mon,17 Mar 2025 12:25:09 GMT 
+ expires: Mon,17 Mar 2025 12:28:09 +0000 
+ strict-transport-security: max-age=63072000; includeSubDomains 
+ x-azure-ref: 20250317T122509Z-16b4d76484dgj6sbhC1TYO9cz000000007a000000000fq3b 
+ x-cache: TCP_MISS 
+ x-fd-int-roxy-purgeid: 0 
+ x-frame-options: SAMEORIGIN 
+根据以上内容新增获取机场天气报文功能，为了确保API访问不会过大，为MATER和TAF添加缓存机制（15分钟），另外增加翻译功能，将获取到的METAR和TAF自动翻译为对应的中文语句
