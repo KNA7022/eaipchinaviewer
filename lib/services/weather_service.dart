@@ -71,7 +71,6 @@ class WeatherService {
     }
   }
 
-  // 添加手动清理缓存的方法
   Future<void> clearCache(String icao) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -81,7 +80,6 @@ class WeatherService {
     }
   }
 
-  // 添加清理所有过期缓存的方法
   Future<void> clearExpiredCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();

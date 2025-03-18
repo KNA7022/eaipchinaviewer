@@ -41,7 +41,9 @@ class WeatherData {
           .toList() ?? [],
       rawMetar: json['rawOb']?.toString() ?? '',
       rawTaf: json['rawTaf']?.toString(),
-      cacheTime: DateTime.now(),
+      cacheTime: json['cacheTime'] != null 
+          ? DateTime.parse(json['cacheTime'])
+          : DateTime.now(),
     );
   }
 
