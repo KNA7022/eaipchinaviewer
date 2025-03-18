@@ -12,47 +12,32 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:cross_file/cross_file.dart';  // 添加这行导入
+import 'package:cross_file/cross_file.dart';  
 import '../services/connectivity_service.dart';
 
 abstract class PdfViewerPlatform extends StatefulWidget {
   final String url;
   final String title;
-  final bool showAppBar;  // 添加这个字段
+  final bool showAppBar;  
 
   const PdfViewerPlatform({
     super.key,
     required this.url,
     required this.title,
-    this.showAppBar = true,  // 默认显示AppBar
+    this.showAppBar = true,  
   });
 
   factory PdfViewerPlatform.create({
-    Key? key,  // 添加 key 参数
+    Key? key,  
     required String url,
     required String title,
-    bool showAppBar = true,  // 添加这个参数
+    bool showAppBar = true,  
   }) {
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      return WindowsPdfViewer(key: key, url: url, title: title, showAppBar: showAppBar);
-    } else {
       return MobilePdfViewer(key: key, url: url, title: title, showAppBar: showAppBar);
-    }
   }
 }
 
-// Windows平台实现
-class WindowsPdfViewer extends PdfViewerPlatform {
-  const WindowsPdfViewer({
-    super.key,
-    required super.url,
-    required super.title,
-    required bool showAppBar,
-  }) : super(showAppBar: showAppBar);
 
-  @override
-  State<WindowsPdfViewer> createState() => _WindowsPdfViewerState();
-}
 
 // 移动平台实现
 class MobilePdfViewer extends PdfViewerPlatform {
@@ -67,14 +52,6 @@ class MobilePdfViewer extends PdfViewerPlatform {
   State<MobilePdfViewer> createState() => _MobilePdfViewerState();
 }
 
-// Windows平台状态实现
-class _WindowsPdfViewerState extends State<WindowsPdfViewer> {
-  // ... 这里保留原来的 Windows Webview 实现 ...
-  @override
-  Widget build(BuildContext context) {
-    return Container(); // 临时占位
-  }
-}
 
 // 移动平台状态实现
 class _MobilePdfViewerState extends State<MobilePdfViewer> {
@@ -327,7 +304,7 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
           if (!_isLoading && _localPath != null) ...[
             Center(
               child: Text(
-                '${(_currentPage ?? 0) + 1}/${_totalPages ?? 0}',  // 修改这里，页数加1
+                '${(_currentPage ?? 0) + 1}/${_totalPages ?? 0}',  
                 style: const TextStyle(fontSize: 16),
               ),
             ),

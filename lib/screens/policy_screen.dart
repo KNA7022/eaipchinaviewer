@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PolicyScreen extends StatefulWidget {
   final String type;
   final bool isFirstRun;
-  final bool showBothPolicies;  // 添加这个参数
+  final bool showBothPolicies;  
 
   const PolicyScreen({
     super.key,

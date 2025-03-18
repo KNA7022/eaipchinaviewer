@@ -17,7 +17,7 @@ class PdfViewerScreen extends StatelessWidget {
       key: ValueKey(url), // 添加 key 以强制重建
       url: url,
       title: title,
-      showAppBar: false, // 添加这个参数
+      showAppBar: false, 
     );
   }
 }

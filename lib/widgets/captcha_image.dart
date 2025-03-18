@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:typed_data';  // 添加这一行
+import 'dart:typed_data';  
 import 'package:http/io_client.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
-import '../services/connectivity_service.dart';  // 添加这一行
+import '../services/connectivity_service.dart';  
 
 class CaptchaImage extends StatefulWidget {
   final Function(String) onCaptchaIdGenerated;

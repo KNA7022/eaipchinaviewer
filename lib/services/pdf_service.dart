@@ -25,7 +25,6 @@ class PdfService {
 
     try {
       final request = await client.getUrl(Uri.parse(url));
-      // Add headers
       final headers = await getRequestHeaders();
       headers.forEach((key, value) => request.headers.set(key, value));
       

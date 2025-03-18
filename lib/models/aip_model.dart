@@ -289,7 +289,7 @@ static List<int> _getEnrSectionNumbers(String nameCn) {
     return match?.group(1)?.split('.')?.map(int.parse)?.toList() ?? [];
   }
 
-  // 修复点3：添加静态的copyWith方法
+  // 添加静态的copyWith方法
   AipItem copyWith({
     String? nameCn,
     String? isModified,

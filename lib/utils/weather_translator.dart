@@ -270,7 +270,6 @@ class WeatherTranslator {
       'BR': '轻雾', 'HZ': '霾', 'TS': '雷暴',
       'DZ': '毛毛雨', 'SH': '阵雨', 'FZ': '冻',
       'GR': '冰雹', 'DU': '扬沙', 'SA': '沙尘',
-      // 可以继续添加更多天气现象的翻译
     };
 
     String intensity = code.startsWith('+') ? '强' : 

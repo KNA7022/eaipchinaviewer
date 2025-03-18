@@ -26,12 +26,10 @@ yc7BQ34Ao/JH862rRQIDAQAB
       
       // 直接返回 base64 编码结果，不进行 URI 编码
       final encoded = base64.encode(encrypted);
-      print('原始密码: $password');
-      print('加密结果: $encoded');
+
       
       return encoded;
     } catch (e) {
-      print('RSA加密失败: $e');
       return '';
     }
   }
@@ -55,8 +53,8 @@ class RSAKeyParser {
       final exponent = publicKeySeq.elements[1] as ASN1Integer;
       
       return RSAPublicKey(
-        modulus.valueAsBigInteger!, // 修改这里
-        exponent.valueAsBigInteger!, // 修改这里
+        modulus.valueAsBigInteger!,
+        exponent.valueAsBigInteger!,
       );
     } catch (e) {
       throw Exception('无效的公钥格式: $e');

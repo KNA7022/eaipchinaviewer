@@ -39,7 +39,6 @@ class ApiService {
   // 新增：加载配置
   Future<void> loadConfig() async {
     try {
-      // TODO: 实现配置文件加载
       final proxyUrl = ''; // 从配置文件读取
       if (proxyUrl.isNotEmpty) {
         _proxy = {
@@ -135,7 +134,6 @@ class ApiService {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['retCode'] == 200) {
-            // 修改这里：使用setLoginCookies而不是setLoginCookie
             final token = data['data']['token'];
             final userUuid = data['data']['eaipUserUuid'];
             setLoginCookies(token, userUuid); // 直接设置token和userId
@@ -304,7 +302,6 @@ class ApiService {
             return '$baseUrl/$basePath/$version/$relativePath';
           }
           
-          // 其他情况直接使用完整路径
           return '$baseUrl/$pdfPath';
         }
       }
@@ -317,7 +314,6 @@ class ApiService {
   Future<List<dynamic>?> getAipJson(Map<String, dynamic> packageInfo) async {
     try {
       if (_token == null) {
-        print('Token不存在，需要重新登录');
         return null;
       }
 
@@ -328,12 +324,9 @@ class ApiService {
         });
 
       final String basePath = packageInfo["filePath"];
-      // 移除版本拼接,直接使用basePath
       final url = "$baseUrl/$basePath/JsonPath/AIP.JSON";
       
-      print('AIP.JSON请求头: ${JsonEncoder.withIndent('  ').convert(headers)}');
-      print('请求URL: $url'); // 用于调试URL
-      
+
       final client = await _getClient();
       final response = await client.get(
         Uri.parse(url),
@@ -341,14 +334,12 @@ class ApiService {
       );
       
       if (response.statusCode != 200) {
-        print("获取AIP.JSON失败, 状态码: ${response.statusCode}");
         return null;
       }
       
       final data = jsonDecode(response.body) as List<dynamic>;
       return data;
     } catch (e) {
-      print("获取AIP.JSON失败: $e");
       return null;
     }
   }

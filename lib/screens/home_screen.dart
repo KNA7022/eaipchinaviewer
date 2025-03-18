@@ -3,9 +3,9 @@ import '../models/aip_model.dart';
 import '../services/api_service.dart';
 import 'pdf_viewer_screen.dart';
 import '../services/auth_service.dart';
-import '../models/version_model.dart';  // 添加这个导入
-import 'package:intl/intl.dart';  // 添加这一行导入
-import '../screens/weather_screen.dart';  // 添加这一行
+import '../models/version_model.dart';  
+import 'package:intl/intl.dart';  
+import '../screens/weather_screen.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,14 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastRefreshTime;
   bool _isRefreshCooling = false;
   static const _refreshCooldown = Duration(seconds: 15);
-
-  // 添加搜索相关的状态变量
   final List<AipItem> _filteredItems = [];
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSearching = false;
-
-  // 添加搜索索引
   final Map<String, List<AipItem>> _searchIndex = {};
 
   @override
@@ -281,7 +277,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 优化搜索方法
   void _handleSearch(String query) {
     setState(() {
       _searchQuery = query.toLowerCase();
@@ -331,10 +326,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return const SizedBox.shrink();
     }
 
-    // 调试输出
-    if (item.nameCn.startsWith('ENR')) {
-      print('构建项: ${item.nameCn}, 子项数量: ${item.children.length}');
-    }
     
     // 如果有子项，创建可展开的项（注意：空列表也被认为是空）
     if (item.children.isNotEmpty) {
@@ -342,7 +333,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .where((child) => child.nameCn.isNotEmpty)
           .toList();
           
-      print('有效子项数量: ${validChildren.length}');
 
       if (validChildren.isNotEmpty) {
         return Theme(
@@ -420,7 +410,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('航图查看器'),
         actions: [
-          // 添加天气按钮
           IconButton(
             icon: const Icon(Icons.wb_sunny),
             tooltip: '机场天气',
@@ -492,7 +481,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            // 添加生效和失效日期显示
                             RichText(
                               text: TextSpan(
                                 style: TextStyle(

@@ -72,8 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      print('尝试登录: ${_usernameController.text}'); // 用于调试
-      print('验证码ID: $_captchaId'); // 用于调试
       
       final api = ApiService();
       final result = await api.login(
@@ -83,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _captchaId,
       );
 
-      print('登录结果: $result'); // 用于调试
+
 
       if (result != null && result['retCode'] == 200) {
         final token = result['data']['token'];
@@ -119,7 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e) {
-      print('登录异常: $e'); // 用于调试
       setState(() {
         _errorMessage = '网络错误，请重试';
       });
@@ -197,7 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 validator: (value) => value?.isEmpty ?? true ? '请输入密码' : null,
                               ),
                               
-                              // 添加记住密码选项
                               Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
                                 child: Row(
@@ -278,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       // 底部版权信息
                       const SizedBox(height: 24),
                       Text(
-                        '© 2025 EAIP中国航图查看器',
+                        '© 2025 KNA7022',
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),

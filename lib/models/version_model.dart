@@ -5,7 +5,7 @@ class EaipVersion {
   final String name;
   final String status;
   final DateTime effectiveDate;
-  final DateTime? deadlineDate;  // 添加失效日期
+  final DateTime? deadlineDate;  
   final String filePath;
 
   EaipVersion({
