@@ -262,26 +262,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip),
-            title: const Text('隐私政策'),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PolicyScreen(type: 'privacy'),
+          const Divider(height: 1),
+          
+          // 将隐私政策和用户协议合并为一个选项
+          _buildSection(
+            icon: Icons.gavel,
+            title: '法律条款',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.policy),
+                title: const Text('用户协议与隐私政策'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PolicyScreen(
+                      type: 'privacy',
+                      showBothPolicies: true,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text('用户协议'),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PolicyScreen(type: 'terms'),
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -343,8 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showLogoutDialog(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
+    final confirmed = await showDialog<bool>(      context: context,
       builder: (context) => AlertDialog(
         title: const Text('退出登录'),
         content: const Text('退出将清除所有本地数据，确定继续吗？'),
