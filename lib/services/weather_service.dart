@@ -39,17 +39,73 @@ class WeatherService {
   }
 
   Future<WeatherData?> _getCachedWeather(String icao) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('weather_$icao');
-    if (cached != null) {
-      return WeatherData.fromJson(json.decode(cached));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('weather_$icao');
+      if (cached != null) {
+        final weatherData = WeatherData.fromJson(json.decode(cached));
+        // 检查缓存是否过期
+        final cacheAge = DateTime.now().difference(weatherData.cacheTime);
+        if (cacheAge > _cacheExpiration) {
+          // 如果缓存过期，删除缓存数据
+          await prefs.remove('weather_$icao');
+          return null;
+        }
+        return weatherData;
+      }
+    } catch (e) {
+      print('读取天气缓存失败: $e');
+      // 如果读取缓存出错，清除这条缓存
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('weather_$icao');
     }
     return null;
   }
 
   Future<void> _cacheWeather(String icao, WeatherData data) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('weather_$icao', json.encode(data.toJson()));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('weather_$icao', json.encode(data.toJson()));
+    } catch (e) {
+      print('保存天气缓存失败: $e');
+    }
+  }
+
+  // 添加手动清理缓存的方法
+  Future<void> clearCache(String icao) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('weather_$icao');
+    } catch (e) {
+      print('清理天气缓存失败: $e');
+    }
+  }
+
+  // 添加清理所有过期缓存的方法
+  Future<void> clearExpiredCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allKeys = prefs.getKeys();
+      final weatherKeys = allKeys.where((key) => key.startsWith('weather_'));
+      
+      for (final key in weatherKeys) {
+        final cached = prefs.getString(key);
+        if (cached != null) {
+          try {
+            final weatherData = WeatherData.fromJson(json.decode(cached));
+            final cacheAge = DateTime.now().difference(weatherData.cacheTime);
+            if (cacheAge > _cacheExpiration) {
+              await prefs.remove(key);
+            }
+          } catch (e) {
+            // 如果解析失败，直接删除这条缓存
+            await prefs.remove(key);
+          }
+        }
+      }
+    } catch (e) {
+      print('清理过期缓存失败: $e');
+    }
   }
 
   String getTranslatedMetar(WeatherData data) {

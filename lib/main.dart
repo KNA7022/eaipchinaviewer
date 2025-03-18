@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/weather_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/settings_screen.dart';
@@ -12,6 +13,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await _loadFonts();
+  
+  // 清理过期的天气缓存
+  final weatherService = WeatherService();
+  await weatherService.clearExpiredCache();
   
   final prefs = await SharedPreferences.getInstance();
   final isFirstRun = prefs.getBool('first_run') ?? true;
