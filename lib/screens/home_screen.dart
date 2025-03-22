@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('航图查看器'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.wb_sunny),
+            icon: const Icon(Icons.thunderstorm),
             tooltip: '机场天气',
             onPressed: () => Navigator.push(
               context,
