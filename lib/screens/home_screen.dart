@@ -47,28 +47,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadVersions() async {
+    if (!mounted) return;
     try {
       final api = ApiService();
       final packages = await api.getPackageList();
+      if (!mounted) return;
+      
+      if (packages == null) {
+        // 如果获取数据为空，可能是认证问题
+        final authService = AuthService();
+        final isValidAuth = await authService.isLoggedIn();
+        if (!mounted) return;
+        
+        if (!isValidAuth) {
+          await authService.clearAuthData();
+          if (!mounted) return;
+          Navigator.of(context).pushReplacementNamed('/login');
+          return;
+        }
+      }
+
       if (packages != null && packages['data'] != null) {
         final List<dynamic> data = packages['data']['data'] as List;
         _versions = data.map((item) => EaipVersion.fromJson(item)).toList();
         
-        // 按日期和版本号排序
         _versions.sort((a, b) => b.effectiveDate.compareTo(a.effectiveDate));
         
-        // 设置当前版本
+        if (!mounted) return;
+        
         final currentVersion = _versions.firstWhere(
           (v) => v.status == 'CURRENTLY_ISSUE',
           orElse: () => _versions.first,
         );
+        
         setState(() {
           _currentVersion = currentVersion.name;
-          _loadDataForVersion(_currentVersion);
         });
+        
+        await _loadDataForVersion(_currentVersion);
       }
     } catch (e) {
       print('加载版本列表失败: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载版本列表失败: $e')),
+      );
     }
   }
 
@@ -145,9 +168,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadDataForVersion(String version) async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
-      _selectedPdfUrl = null;  // 清空当前选中的PDF
+      _selectedPdfUrl = null;
       _selectedTitle = null;
       _searchController.clear();
       _searchQuery = '';
@@ -159,29 +184,45 @@ class _HomeScreenState extends State<HomeScreen> {
       final api = ApiService();
       final List<dynamic>? data = await api.getAipStructureForVersion(version);
       
-      if (data != null) {
-        final items = data.map((item) => 
-          AipItem.fromJson(item as Map<String, dynamic>)
-        ).toList();
+      if (!mounted) return;
+
+      if (data == null) {
+        // 如果获取数据为空，检查认证状态
+        final authService = AuthService();
+        final isValidAuth = await authService.isLoggedIn();
+        if (!mounted) return;
         
-        // 对所有项目进行递归排序
-        final sortedItems = _sortAndProcessItems(items);
+        if (!isValidAuth) {
+          await authService.clearAuthData();
+          if (!mounted) return;
+          Navigator.of(context).pushReplacementNamed('/login');
+          return;
+        }
         
-        setState(() {
-          _aipItems.clear();
-          _aipItems.addAll(sortedItems);
-        });
-      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('获取数据失败')),
         );
+        return;
       }
+
+      final items = data.map((item) => 
+        AipItem.fromJson(item as Map<String, dynamic>)
+      ).toList();
+      
+      final sortedItems = _sortAndProcessItems(items);
+      
+      if (!mounted) return;
+      setState(() {
+        _aipItems.clear();
+        _aipItems.addAll(sortedItems);
+        _isLoading = false;
+      });
     } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('加载失败: $e')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 

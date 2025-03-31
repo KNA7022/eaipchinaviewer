@@ -155,89 +155,115 @@ class ApiService {
 
   Future<Map<String, dynamic>?> getPackageList() async {
     try {
-      // 尝试还原认证状态
+      print('开始获取航图版本列表');
       if (!await restoreAuth()) {
+        print('认证状态恢复失败，需要重新登录');
         throw Exception('需要登录');
       }
 
-      // 检查是否有token
-      if (_token == null) {
-        print('Token不存在，需要重新登录');
-        throw Exception('需要登录');
-      }
+      final requestBody = jsonEncode({
+        'pageNo': 1,
+        'pageSize': 50,
+        'dataName': '',
+        'dataType': '',  // 不在请求时过滤，而是在响应中过滤
+        'dataStatus': ''
+      });
 
+      // 准备头部
       final headers = Map<String, String>.from(_defaultHeaders)
         ..addAll({
           'Content-Type': 'application/json',
-          'Content-Length': '2',
+          'Content-Length': utf8.encode(requestBody).length.toString(),
           'token': _token!,
           'Cookie': 'userId=$_userId; username=$_token',
         });
 
-      print('包列表完整请求头: ${JsonEncoder.withIndent('  ').convert(headers)}');
-      
-      // 第一次请求
+      print('请求体: $requestBody');
+      print('请求头: ${JsonEncoder.withIndent('  ').convert(headers)}');
+
       final client = await _getClient();
-      final firstResponse = await client.post(
-        Uri.parse('$baseUrl/package/listPage'),
-        headers: headers,
-        body: '{}',
-      );
-
-      if (firstResponse.statusCode != 200) {
-        print('第一次请求失败: ${firstResponse.statusCode}');
-        return null;
-      }
-
-      final firstData = jsonDecode(firstResponse.body);
-      if (firstData['retCode'] == 0 && 
-          firstData['retMsg']?.contains('login has expired') == true) {
-        print('登录已过期，需要重新登录');
-        return null;
-      }
-
-      // 等待1秒
-      await Future.delayed(const Duration(seconds: 1));
-
-      // 第二次请求
       final response = await client.post(
         Uri.parse('$baseUrl/package/listPage'),
         headers: headers,
-        body: '{}',
+        body: requestBody,
       );
+
+      print('响应状态码: ${response.statusCode}');
+      print('响应头: ${response.headers}');
+      print('响应内容: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        
+        // 过滤响应数据，只保留 BASELINE 类型
+        if (data['data']?['data'] != null) {
+          final List<dynamic> allPackages = data['data']['data'];
+          final List<dynamic> baselinePackages = allPackages
+              .where((pkg) => pkg['dataType'] == 'BASELINE')
+              .toList();
+          
+          print('原始版本数量: ${allPackages.length}');
+          print('过滤后基准版本数量: ${baselinePackages.length}');
+          
+          // 替换原始数据
+          data['data']['data'] = baselinePackages;
+        }
+        
         return data;
       }
-    } catch (e) {
-      print('获取包列表失败: $e');
-      if (e.toString().contains('需要登录') || e.toString().contains('login has expired')) {
-        return null;  // 返回null以触发重新登录流程
-      }
-      rethrow;
+    } catch (e, stack) {
+      print('获取航图版本列表失败:');
+      print('错误: $e');
+      print('堆栈: $stack');
     }
     return null;
   }
 
   Future<List<dynamic>?> getCurrentAipStructure() async {
     try {
+      print('开始获取当前航图结构');
       final packages = await getPackageList();
-      if (packages == null) return null;
+      if (packages == null) {
+        print('获取版本列表失败，返回 null');
+        return null;
+      }
 
-      final packageList = packages['data']['data'] as List;
-      final currentPackage = packageList.firstWhere(
-        (pkg) => pkg['dataStatus'] == 'CURRENTLY_ISSUE',
-        orElse: () => null,
+      print('获取到原始数据:');
+      print(JsonEncoder.withIndent('  ').convert(packages));
+
+      final List<dynamic> allPackages = packages['data']['data'] as List;
+      
+      // 过滤出 BASELINE 类型的版本
+      final baselinePackages = allPackages.where((pkg) {
+        final isBaseline = pkg['dataType'] == 'BASELINE';
+        print('检查版本 ${pkg['dataName']}: type=${pkg['dataType']}, isBaseline=$isBaseline');
+        return isBaseline;
+      }).toList();
+
+      print('过滤后找到 ${baselinePackages.length} 个基准版本');
+      if (baselinePackages.isEmpty) {
+        print('没有找到基准版本，原始列表长度: ${allPackages.length}');
+        print('所有版本类型: ${allPackages.map((p) => p['dataType']).toSet().toList()}');
+        return null;
+      }
+
+      // 按生效时间排序，取最新的版本
+      baselinePackages.sort((a, b) => 
+        DateTime.parse(b['effectiveTime']).compareTo(
+          DateTime.parse(a['effectiveTime'])
+        )
       );
 
-      if (currentPackage != null) {
-        // 保存当前包信息用于构建PDF路径
-        _currentPackage = currentPackage;
-        return await getAipJson(currentPackage);
-      }
-    } catch (e) {
-      print('获取AIP结构失败: $e');
+      final currentPackage = baselinePackages.first;
+      print('选择的基准版本:');
+      print(JsonEncoder.withIndent('  ').convert(currentPackage));
+      
+      _currentPackage = currentPackage;
+      return await getAipJson(currentPackage);
+    } catch (e, stack) {
+      print('获取AIP结构失败:');
+      print('错误: $e');
+      print('堆栈: $stack');
     }
     return null;
   }
@@ -248,15 +274,25 @@ class ApiService {
       if (packages == null) return null;
 
       final packageList = packages['data']['data'] as List;
-      final targetPackage = packageList.firstWhere(
+      
+      // 只保留 BASELINE 类型的版本
+      final baselinePackages = packageList.where((pkg) => 
+        pkg['dataType'] == 'BASELINE'
+      ).toList();
+
+      print('版本切换: 找到 ${baselinePackages.length} 个基准版本');
+
+      final targetPackage = baselinePackages.firstWhere(
         (pkg) => pkg['dataName'] == version,
         orElse: () => null,
       );
 
       if (targetPackage != null) {
-        // 保存当前包信息用于构建PDF路径
+        print('切换到版本: ${targetPackage['dataName']}');
         _currentPackage = targetPackage;
         return await getAipJson(targetPackage);
+      } else {
+        print('未找到指定的基准版本: $version');
       }
     } catch (e) {
       print('获取版本AIP结构失败: $e');
