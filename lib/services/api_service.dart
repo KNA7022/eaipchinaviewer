@@ -117,8 +117,6 @@ class ApiService {
           'Content-Length': utf8.encode(jsonEncode(loginData)).length.toString()
         });
 
-      print('请求头: ${JsonEncoder.withIndent('  ').convert(loginHeaders)}');
-      print('登录数据: ${JsonEncoder.withIndent('  ').convert(loginData)}');
 
       final client = await _getClient();
       try {
@@ -128,8 +126,6 @@ class ApiService {
           body: jsonEncode(loginData),
         ).timeout(const Duration(seconds: timeout));
 
-        print('响应状态码: ${response.statusCode}');
-        print('响应数据: ${response.body}');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -189,8 +185,7 @@ class ApiService {
       );
 
       print('响应状态码: ${response.statusCode}');
-      print('响应头: ${response.headers}');
-      print('响应内容: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -201,9 +196,6 @@ class ApiService {
           final List<dynamic> baselinePackages = allPackages
               .where((pkg) => pkg['dataType'] == 'BASELINE')
               .toList();
-          
-          print('原始版本数量: ${allPackages.length}');
-          print('过滤后基准版本数量: ${baselinePackages.length}');
           
           // 替换原始数据
           data['data']['data'] = baselinePackages;
@@ -227,9 +219,6 @@ class ApiService {
         print('获取版本列表失败，返回 null');
         return null;
       }
-
-      print('获取到原始数据:');
-      print(JsonEncoder.withIndent('  ').convert(packages));
 
       final List<dynamic> allPackages = packages['data']['data'] as List;
       
