@@ -294,7 +294,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('版本信息'),
-                subtitle: const Text('1.2.0'),
+                subtitle: const Text('1.3.1'),
                 onTap: () => _showAboutDialog(context),
               ),
             ],
