@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'policy_screen.dart';
 import '../main.dart';  // 添加这一行
+import 'package:package_info_plus/package_info_plus.dart';  // 添加这一行
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -163,6 +164,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // 添加获取版本信息的方法
+  Future<String> _getAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return '${packageInfo.version} (${packageInfo.buildNumber})';
+    } catch (e) {
+      print('获取版本信息失败: $e');
+      return '1.3.1';  // fallback version
+    }
+  }
+
+  // 修改版本信息的显示方式
+  Widget _buildVersionTile() {
+    return FutureBuilder<String>(
+      future: _getAppVersion(),
+      builder: (context, snapshot) {
+        return ListTile(
+          leading: const Icon(Icons.info_outline),
+          title: const Text('版本信息'),
+          subtitle: Text(snapshot.data ?? '加载中...'),
+          onTap: () => _showAboutDialog(context),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -291,12 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () => _launchUrl('https://github.com/KNA7022/eaipchinaviewer'),
               ),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('版本信息'),
-                subtitle: const Text('1.3.1'),
-                onTap: () => _showAboutDialog(context),
-              ),
+              _buildVersionTile(),  // 使用新的版本信息组件
             ],
           ),
 
