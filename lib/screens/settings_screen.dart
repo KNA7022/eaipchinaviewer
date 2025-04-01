@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/cache_service.dart';
+import '../services/theme_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:math';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';  
 import 'package:shared_preferences/shared_preferences.dart';
 import 'policy_screen.dart';
+import '../main.dart';  // 添加这一行
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,11 +20,31 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _cacheSize = '计算中...';
+  ThemeMode _currentThemeMode = ThemeMode.system;
+  final _themeService = ThemeService();
 
   @override
   void initState() {
     super.initState();
     _calculateCacheSize();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final mode = await _themeService.getThemeMode();
+    setState(() => _currentThemeMode = mode);
+  }
+
+  Future<void> _updateThemeMode(ThemeMode mode) async {
+    await _themeService.setThemeMode(mode);
+    setState(() => _currentThemeMode = mode);
+    if (!mounted) return;
+    
+    // 使用 MainApp.of 方法更新主题
+    final mainApp = MainApp.of(context);
+    if (mainApp != null) {
+      mainApp.setState(() {});
+    }
   }
 
   Future<void> _calculateCacheSize() async {
@@ -152,6 +174,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
+          // 主题设置部分
+          _buildSection(
+            icon: Icons.palette,
+            title: '显示',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.brightness_auto),
+                title: const Text('主题模式'),
+                subtitle: Text(_getThemeModeText()),
+                onTap: _showThemeModeDialog,
+              ),
+            ],
+          ),
+
+          const Divider(height: 1),
+
           // 缓存管理部分
           _buildSection(
             icon: Icons.storage,
@@ -286,6 +324,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  String _getThemeModeText() {
+    switch (_currentThemeMode) {
+      case ThemeMode.light:
+        return '浅色模式';
+      case ThemeMode.dark:
+        return '深色模式';
+      case ThemeMode.system:
+        return '跟随系统';
+    }
+  }
+
+  void _showThemeModeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('选择主题模式'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('跟随系统'),
+              value: ThemeMode.system,
+              groupValue: _currentThemeMode,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _updateThemeMode(value!);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('浅色模式'),
+              value: ThemeMode.light,
+              groupValue: _currentThemeMode,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _updateThemeMode(value!);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('深色模式'),
+              value: ThemeMode.dark,
+              groupValue: _currentThemeMode,
+              onChanged: (value) {
+                Navigator.pop(context);
+                _updateThemeMode(value!);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

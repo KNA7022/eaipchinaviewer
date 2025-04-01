@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/weather_service.dart';
+import 'services/theme_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/settings_screen.dart';
@@ -38,7 +39,7 @@ Future<void> _loadFonts() async {
   }
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   final bool isFirstRun;
   final bool isLoggedIn;
   
@@ -47,6 +48,31 @@ class MainApp extends StatelessWidget {
     required this.isFirstRun,
     required this.isLoggedIn,
   });
+
+  // 添加静态方法来访问主题状态
+  static MainAppState? of(BuildContext context) {
+    return context.findAncestorStateOfType<MainAppState>();
+  }
+
+  @override
+  State<MainApp> createState() => MainAppState();
+}
+
+// 将 _MainAppState 改为公开的 MainAppState
+class MainAppState extends State<MainApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+  final _themeService = ThemeService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final mode = await _themeService.getThemeMode();
+    setState(() => _themeMode = mode);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,9 +110,10 @@ class MainApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: isFirstRun 
+      themeMode: _themeMode,
+      home: widget.isFirstRun 
           ? const PolicyScreen(type: 'privacy', isFirstRun: true)
-          : isLoggedIn 
+          : widget.isLoggedIn 
               ? const HomeScreen() 
               : const LoginScreen(),
       routes: {
