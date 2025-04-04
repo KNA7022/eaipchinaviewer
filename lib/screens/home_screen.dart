@@ -140,38 +140,44 @@ class _HomeScreenState extends State<HomeScreen> {
       _lastRefreshTime = DateTime.now();  // 记录刷新时间
       _startRefreshCooldown();
       
-      final api = ApiService();
-      final List<dynamic>? data = await api.getCurrentAipStructure();
-      
-      if (data != null) {
-        // 创建项目列表并立即排序
-        final items = data
-            .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
-            .toList();
-        final sortedItems = _sortAndProcessItems(items);
-        
-        // 构建搜索索引
-        _buildSearchIndex(sortedItems);
-        
-        setState(() {
-          _aipItems.clear();
-          _aipItems.addAll(sortedItems);
-          _searchController.clear();
-          _searchQuery = '';
-          _isSearching = false;
-          _filteredItems.clear();
-        });
+      // 使用当前选中的版本刷新数据
+      if (_currentVersion.isNotEmpty) {
+        await _loadDataForVersion(_currentVersion);
       } else {
-        final authService = AuthService();
-        await authService.clearAuthData();
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/login');
+        // 如果没有当前版本（极少情况），则获取当前生效版本
+        final api = ApiService();
+        final List<dynamic>? data = await api.getCurrentAipStructure();
+        
+        if (data != null) {
+          final items = data
+              .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
+              .toList();
+          final sortedItems = _sortAndProcessItems(items);
+          
+          _buildSearchIndex(sortedItems);
+          
+          setState(() {
+            _aipItems.clear();
+            _aipItems.addAll(sortedItems);
+            _searchController.clear();
+            _searchQuery = '';
+            _isSearching = false;
+            _filteredItems.clear();
+          });
+        } else {
+          final authService = AuthService();
+          await authService.clearAuthData();
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('加载失败: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载失败: $e')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
