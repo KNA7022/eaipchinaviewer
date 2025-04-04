@@ -36,8 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // 只调用 _loadVersions，因为它会自动加载当前版本的数据
     _loadVersions();
-    _loadData();
   }
 
   @override
@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadVersions() async {
     if (!mounted) return;
     try {
+      setState(() => _isLoading = true);
       final api = ApiService();
       final packages = await api.getPackageList();
       if (!mounted) return;
@@ -75,15 +76,20 @@ class _HomeScreenState extends State<HomeScreen> {
         
         if (!mounted) return;
         
+        // 先找到当前生效版本
         final currentVersion = _versions.firstWhere(
           (v) => v.status == 'CURRENTLY_ISSUE',
           orElse: () => _versions.first,
         );
         
-        setState(() {
-          _currentVersion = currentVersion.name;
-        });
+        // 设置当前版本并加载数据
+        _currentVersion = currentVersion.name;
         
+        // 记录刷新时间和开始冷却
+        _lastRefreshTime = DateTime.now();
+        _startRefreshCooldown();
+        
+        // 加载当前版本的数据
         await _loadDataForVersion(_currentVersion);
       }
     } catch (e) {
@@ -92,6 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('加载版本列表失败: $e')),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
