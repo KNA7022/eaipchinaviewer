@@ -32,18 +32,6 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
-# 添加NuGet包还原命令
-find_program(NUGET_EXE NAMES nuget)
-if(NOT NUGET_EXE)
-  message(FATAL_ERROR "NuGet not found. Please install NuGet command-line tool.")
-endif()
-
-# 还原NuGet包
-execute_process(
-  COMMAND ${NUGET_EXE} restore ${CMAKE_CURRENT_SOURCE_DIR}/packages.config
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
@@ -64,6 +52,8 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# 添加 WinHTTP 库
+target_link_libraries(${BINARY_NAME} PRIVATE winhttp)
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
