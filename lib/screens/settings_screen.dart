@@ -171,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return '${packageInfo.version} (${packageInfo.buildNumber})';
     } catch (e) {
       print('获取版本信息失败: $e');
-      return '1.3.1';  // fallback version
+      return '1.3.4';  // fallback version
     }
   }
 
@@ -486,7 +486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showAboutDialog(
       context: context,
       applicationName: 'EAIP中国航图查看器',
-      applicationVersion: '1.2.0',
+      applicationVersion: '1.3.4',
       applicationIcon: const Icon(Icons.flight),
       children: [
         const Text('这是一个非官方的第三方应用程序，用于查看中国民航英文航图，此版本航图不涉及国家机密，请注意甄别'),
