@@ -54,14 +54,14 @@ class AipItem {
     if (nameCn == null) return false;
     
     final enrPattern = RegExp(r'ENR\s*6(\.\d+)*');
-    final airportPattern = RegExp(r'^Z[PBGHLSUWY][A-Z]{2}');
+    final airportPattern = RegExp(r'^Z[PBGHLJSUWY][A-Z]{2}');
     
     return enrPattern.hasMatch(nameCn) ||
         parentPath.any((p) => enrPattern.hasMatch(p)) ||
         nameCn.contains("AD 2 机场清单") ||
         airportPattern.hasMatch(nameCn) ||
         (parentPath.any((p) => p.contains('机场清单')) && 
-         RegExp(r'Z[PBGHLSUWY][A-Z]{2}-\d[A-Z]?\d?\d?').hasMatch(nameCn));
+         RegExp(r'Z[PBGHLJSUWY][A-Z]{2}-\d[A-Z]?\d?\d?').hasMatch(nameCn));
   }
 
   static String _decodeUtf8String(String input) {
@@ -135,7 +135,7 @@ class AipItem {
     // 分离 ENR 和机场项
     final enrItems = items.where((item) => item.nameCn.startsWith('ENR')).toList();
     final airportItems = items.where((item) => 
-      RegExp(r'Z[PBGHLSUWY][A-Z]{2}').hasMatch(item.nameCn)
+      RegExp(r'Z[PBGHLJSUWY][A-Z]{2}').hasMatch(item.nameCn)
     ).toList();
     
     // 将所有已处理的项添加到 processedItems
@@ -210,7 +210,7 @@ class AipItem {
     }
 
     // 处理机场项
-    final airportCodeRegex = RegExp(r'^(Z[PBGHLSUWY][A-Z]{2})\b');
+    final airportCodeRegex = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})\b');
     
     // 第一阶段：收集所有父项信息
     final airportParentItems = airportItems.where(
@@ -274,7 +274,7 @@ class AipItem {
   }
 
   String? get airportCode {
-    final match = RegExp(r'^(Z[PBGHLSUWY][A-Z]{2})\b').firstMatch(nameCn);
+    final match = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})\b').firstMatch(nameCn);
     return match?.group(1);
   }
 
