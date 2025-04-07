@@ -55,15 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       
       if (packages == null) {
-        // 如果获取数据为空，可能是认证问题
+        // 如果获取数据为空，直接跳转到登录界面
         final authService = AuthService();
-          await authService.clearAuthData();
-          if (!mounted) return;
-          Navigator.of(context).pushReplacementNamed('/login');
-          return;
+        await authService.clearAuthData();
+        Navigator.of(context).pushReplacementNamed('/login');
+        return;
       }
 
-      if (packages != null && packages['data'] != null) {
+      if (packages['data'] != null) {
         final List<dynamic> data = packages['data']['data'] as List;
         _versions = data.map((item) => EaipVersion.fromJson(item)).toList();
         

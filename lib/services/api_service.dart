@@ -154,7 +154,7 @@ class ApiService {
       print('开始获取航图版本列表');
       if (!await restoreAuth()) {
         print('认证状态恢复失败，需要重新登录');
-        throw Exception('需要登录');
+        return null; // 直接返回 null，避免继续请求
       }
 
       final requestBody = jsonEncode({
@@ -186,10 +186,13 @@ class ApiService {
 
       print('响应状态码: ${response.statusCode}');
 
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
+        if(data['retCode'] == 0 || data['retMsg'] == "login has expired") {
+          print('获取航图版本列表失败: ${data['retMsg']}');
+          return null;
+        }
         // 过滤响应数据，只保留 BASELINE 类型
         if (data['data']?['data'] != null) {
           final List<dynamic> allPackages = data['data']['data'];
@@ -201,11 +204,11 @@ class ApiService {
           data['data']['data'] = baselinePackages;
         }
         
+        
         return data;
       }
     } catch (e, stack) {
-      print('获取航图版本列表失败:');
-      print('错误: $e');
+      print('获取航图版本列表失败: $e');
       print('堆栈: $stack');
     }
     return null;
