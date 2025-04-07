@@ -57,15 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (packages == null) {
         // 如果获取数据为空，可能是认证问题
         final authService = AuthService();
-        final isValidAuth = await authService.isLoggedIn();
-        if (!mounted) return;
-        
-        if (!isValidAuth) {
           await authService.clearAuthData();
           if (!mounted) return;
           Navigator.of(context).pushReplacementNamed('/login');
           return;
-        }
       }
 
       if (packages != null && packages['data'] != null) {
@@ -203,21 +198,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       if (data == null) {
-        // 如果获取数据为空，检查认证状态
+        // token失效，直接清除认证数据并跳转到登录页面
         final authService = AuthService();
-        final isValidAuth = await authService.isLoggedIn();
+        await authService.clearAuthData();
         if (!mounted) return;
-        
-        if (!isValidAuth) {
-          await authService.clearAuthData();
-          if (!mounted) return;
-          Navigator.of(context).pushReplacementNamed('/login');
-          return;
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('获取数据失败')),
-        );
+        Navigator.of(context).pushReplacementNamed('/login');
         return;
       }
 
