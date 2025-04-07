@@ -215,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _aipItems.clear();
         _aipItems.addAll(sortedItems);
+        _buildSearchIndex(sortedItems);
         _isLoading = false;
       });
     } catch (e) {
