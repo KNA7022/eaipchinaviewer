@@ -1,0 +1,179 @@
+> flutter analyze
+Resolving dependencies...
+Downloading packages...
+  async 2.12.0 (2.13.0 available)
+  connectivity_plus 5.0.2 (6.1.3 available)
+  connectivity_plus_platform_interface 1.2.4 (2.0.1 available)
+  cross_file 0.3.3+8 (0.3.4+2 available)
+  fake_async 1.3.2 (1.3.3 available)
+  flutter_cache_manager 3.4.0 (3.4.1 available)
+  flutter_launcher_icons 0.13.1 (0.14.3 available)
+  flutter_lints 3.0.2 (5.0.0 available)
+  flutter_markdown 0.6.23 (0.7.7 available)
+  http 1.2.0 (1.3.0 available)
+  intl 0.19.0 (0.20.2 available)
+  js 0.6.7 (0.7.2 available)
+  leak_tracker 10.0.8 (10.0.9 available)
+  lints 3.0.0 (5.1.1 available)
+  material_color_utilities 0.11.1 (0.12.0 available)
+  mime 1.0.6 (2.0.0 available)
+  open_file 3.5.4 (3.5.10 available)
+  open_file_web 0.0.2 (0.0.4 available)
+  package_info_plus 5.0.1 (8.3.0 available)
+  package_info_plus_platform_interface 2.0.1 (3.2.0 available)
+  permission_handler 11.4.0 (12.0.0+1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  permission_handler_html 0.1.1 (0.1.3+5 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  share_plus 7.2.2 (10.1.4 available)
+  share_plus_platform_interface 3.4.0 (5.0.2 available)
+  shared_preferences 2.2.3 (2.5.3 available)
+  shared_preferences_web 2.2.2 (2.4.3 available)
+  url_launcher_web 2.2.3 (2.4.0 available)
+  vm_service 14.3.1 (15.0.0 available)
+  web 0.4.2 (1.1.1 available)
+  webview_windows 0.3.0 (0.4.0 available)
+Got dependencies!
+32 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Package open_file:macos references open_file_macos:macos as the default plugin, but the package does not exist, or is not a plugin package.
+Ask the maintainers of open_file to either avoid referencing a default implementation via `platforms: macos: default_package: open_file_macos` or create a plugin named open_file_macos.
+
+Package open_file:macos references open_file_macos:macos as the default plugin, but the package does not exist, or is not a plugin package.
+Ask the maintainers of open_file to either avoid referencing a default implementation via `platforms: macos: default_package: open_file_macos` or create a plugin named open_file_macos.
+
+Package open_file:macos references open_file_macos:macos as the default plugin, but the package does not exist, or is not a plugin package.
+Ask the maintainers of open_file to either avoid referencing a default implementation via `platforms: macos: default_package: open_file_macos` or create a plugin named open_file_macos.
+
+Analyzing clone...                                              
+
+   info • Don't invoke 'print' in production code • lib/main.dart:40:5 • avoid_print
+warning • The value of the field '_themeMode' isn't used • lib/main.dart:66:13 • unused_field
+   info • Use 'const' with the constructor to improve performance • lib/main.dart:93:24 • prefer_const_constructors
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:71:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:164:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:166:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:175:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:191:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:193:11 • avoid_print
+   info • Unnecessary braces in a string interpolation • lib/models/aip_model.dart:193:38 • unnecessary_brace_in_string_interps
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:206:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/models/aip_model.dart:271:7 • avoid_print
+warning • The declaration '_buildEnrName' isn't referenced • lib/models/aip_model.dart:282:8 • unused_element
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/models/aip_model.dart:289:39 • invalid_null_aware_operator
+warning • The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used • lib/models/aip_model.dart:289:55 • invalid_null_aware_operator
+warning • The declaration 'equals' isn't referenced • lib/models/aip_model.dart:314:8 • unused_element
+warning • Unused import: 'dart:convert' • lib/models/weather_model.dart:1:8 • unused_import
+warning • The left operand can't be null, so the right operand is never executed • lib/models/weather_model.dart:90:40 • dead_null_aware_expression
+   info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/platform/pdf_viewer_platform.dart:2:8 • unnecessary_import
+   info • The import of 'package:flutter_cached_pdfview/flutter_cached_pdfview.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter_pdfview/flutter_pdfview.dart' • lib/platform/pdf_viewer_platform.dart:3:8 • unnecessary_import
+warning • Unused import: '../services/auth_service.dart' • lib/platform/pdf_viewer_platform.dart:4:8 • unused_import
+warning • Unused import: 'package:http/io_client.dart' • lib/platform/pdf_viewer_platform.dart:6:8 • unused_import
+warning • Unused import: 'dart:convert' • lib/platform/pdf_viewer_platform.dart:7:8 • unused_import
+warning • Unused import: 'package:webview_flutter/webview_flutter.dart' • lib/platform/pdf_viewer_platform.dart:10:8 • unused_import
+warning • Unused import: 'package:path_provider/path_provider.dart' • lib/platform/pdf_viewer_platform.dart:14:8 • unused_import
+   info • The import of 'package:cross_file/cross_file.dart' is unnecessary because all of the used elements are also provided by the import of 'package:share_plus/share_plus.dart' • lib/platform/pdf_viewer_platform.dart:15:8 • unnecessary_import
+   info • The imported package 'cross_file' isn't a dependency of the importing package • lib/platform/pdf_viewer_platform.dart:15:8 • depend_on_referenced_packages
+   info • Parameter 'showAppBar' could be a super parameter • lib/platform/pdf_viewer_platform.dart:44:9 • use_super_parameters
+   info • Don't invoke 'print' in production code • lib/platform/pdf_viewer_platform.dart:97:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/platform/pdf_viewer_platform.dart:107:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/platform/pdf_viewer_platform.dart:199:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/platform/pdf_viewer_platform.dart:267:29 • avoid_print
+   info • Don't invoke 'print' in production code • lib/platform/pdf_viewer_platform.dart:270:29 • avoid_print
+   info • The private field _currentIndex could be 'final' • lib/screens/home_screen.dart:18:7 • prefer_final_fields
+warning • The value of the field '_currentIndex' isn't used • lib/screens/home_screen.dart:18:7 • unused_field
+warning • The value of the field '_isRefreshCooling' isn't used • lib/screens/home_screen.dart:28:8 • unused_field
+   info • Don't use 'BuildContext's across async gaps • lib/screens/home_screen.dart:61:22 • use_build_context_synchronously
+   info • Don't invoke 'print' in production code • lib/screens/home_screen.dart:90:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/home_screen.dart:262:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/home_screen.dart:264:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/home_screen.dart:266:13 • avoid_print
+   info • Use 'const' with the constructor to improve performance • lib/screens/home_screen.dart:476:21 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/home_screen.dart:478:25 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/home_screen.dart:480:29 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/home_screen.dart:481:29 • prefer_const_constructors
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/home_screen.dart:511:63 • deprecated_member_use
+warning • Unused import: 'dart:convert' • lib/screens/login_screen.dart:1:8 • unused_import
+   info • The private field _currentIndex could be 'final' • lib/screens/policy_screen.dart:26:7 • prefer_final_fields
+warning • The value of the field '_currentIndex' isn't used • lib/screens/policy_screen.dart:26:7 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/policy_screen.dart:173:62 • deprecated_member_use
+warning • Unused import: '../services/cache_service.dart' • lib/screens/settings_screen.dart:3:8 • unused_import
+   info • The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/screens/settings_screen.dart:8:8 • unnecessary_import
+warning • Unused import: 'package:shared_preferences/shared_preferences.dart' • lib/screens/settings_screen.dart:10:8 • unused_import
+   info • Don't invoke 'print' in production code • lib/screens/settings_screen.dart:74:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/settings_screen.dart:90:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/settings_screen.dart:173:7 • avoid_print
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/settings_screen.dart:262:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/weather_screen.dart:185:62 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/screens/weather_screen.dart:191:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/weather_screen.dart:191:69 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps • lib/screens/weather_screen.dart:228:40 • use_build_context_synchronously
+   info • 'surfaceVariant' is deprecated and shouldn't be used. Use surfaceContainerHighest instead. This feature was deprecated after v3.18.0-0.1.pre • lib/screens/weather_screen.dart:238:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/weather_screen.dart:238:71 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps • lib/screens/weather_screen.dart:251:40 • use_build_context_synchronously
+   info • 'surfaceVariant' is deprecated and shouldn't be used. Use surfaceContainerHighest instead. This feature was deprecated after v3.18.0-0.1.pre • lib/screens/weather_screen.dart:261:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/weather_screen.dart:261:71 • deprecated_member_use
+warning • The value of the field '_cookies' isn't used • lib/services/api_service.dart:30:29 • unused_field
+   info • The private field _verifySSL could be 'final' • lib/services/api_service.dart:31:8 • prefer_final_fields
+warning • The value of the field '_verifySSL' isn't used • lib/services/api_service.dart:31:8 • unused_field
+warning • The value of the field '_proxy' isn't used • lib/services/api_service.dart:32:24 • unused_field
+   info • Use 'const' for final variables initialized to a constant value • lib/services/api_service.dart:42:7 • prefer_const_declarations
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:50:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:136:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:137:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:140:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:147:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:154:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:156:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:177:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:178:7 • avoid_print
+   info • Use 'const' with the constructor to improve performance • lib/services/api_service.dart:178:21 • prefer_const_constructors
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:187:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:193:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:211:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:212:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:219:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:222:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:231:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:235:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:237:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:238:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:250:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:251:7 • avoid_print
+   info • Use 'const' with the constructor to improve performance • lib/services/api_service.dart:251:13 • prefer_const_constructors
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:256:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:257:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:258:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:275:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:283:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:287:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:290:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/api_service.dart:337:7 • avoid_print
+warning • Unused import: 'dart:io' • lib/services/cache_service.dart:2:8 • unused_import
+warning • Unused import: 'package:flutter/foundation.dart' • lib/services/connectivity_service.dart:2:8 • unused_import
+warning • Unused import: 'package:http/http.dart' • lib/services/pdf_service.dart:2:8 • unused_import
+   info • Don't invoke 'print' in production code • lib/services/weather_service.dart:36:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/weather_service.dart:57:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/weather_service.dart:70:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/weather_service.dart:79:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/weather_service.dart:105:7 • avoid_print
+warning • The '!' will have no effect because the receiver can't be null • lib/utils/rsa_helper.dart:56:34 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null • lib/utils/rsa_helper.dart:57:35 • unnecessary_non_null_assertion
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:73:28 • unnecessary_brace_in_string_interps
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:98:37 • unnecessary_brace_in_string_interps
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:98:48 • unnecessary_brace_in_string_interps
+warning • The declaration '_translateTafPart' isn't referenced • lib/utils/weather_translator.dart:137:17 • unused_element
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:146:26 • unnecessary_brace_in_string_interps
+warning • The declaration '_translateForecastGroup' isn't referenced • lib/utils/weather_translator.dart:165:17 • unused_element
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:248:27 • unnecessary_brace_in_string_interps
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:248:39 • unnecessary_brace_in_string_interps
+   info • Unnecessary braces in a string interpolation • lib/utils/weather_translator.dart:250:25 • unnecessary_brace_in_string_interps
+warning • The value of the field '_imageUrl' isn't used • lib/widgets/captcha_image.dart:25:11 • unused_field
+   info • Don't invoke 'print' in production code • lib/widgets/captcha_image.dart:87:7 • avoid_print
+   info • Use 'const' with the constructor to improve performance • lib/widgets/captcha_image.dart:111:34 • prefer_const_constructors
+
+124 issues found. (ran in 8.9s)
+
+
+QA failed :|
+Flutter analyze found issues.
