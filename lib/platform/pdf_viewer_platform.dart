@@ -261,7 +261,9 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
                           fitPolicy: FitPolicy.BOTH,
                           preventLinkNavigation: false,
                           onRender: (pages) {
-                            setState(() => _totalPages = pages);
+                            if (pages != null) {
+                              setState(() => _totalPages = pages);
+                            }
                           },
                           onError: (error) {
                             print('PDF渲染错误: $error');
@@ -270,7 +272,9 @@ class _MobilePdfViewerState extends State<MobilePdfViewer> {
                             print('第$page页加载错误: $error');
                           },
                           onPageChanged: (page, total) {
-                            setState(() => _currentPage = page);
+                            if (page != null) {
+                              setState(() => _currentPage = page);
+                            }
                           },
                         ),
                         if (!_isLoading && _localPath != null)
