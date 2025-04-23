@@ -9,6 +9,10 @@ import 'screens/settings_screen.dart';
 import 'screens/weather_screen.dart';
 import 'services/auth_service.dart';
 import 'screens/policy_screen.dart';
+import 'services/update_service.dart';
+
+// 全局导航键，用于在任何地方获取有效的context
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,9 +67,11 @@ class MainApp extends StatefulWidget {
 // 公开的 MainAppState
 class MainAppState extends State<MainApp> {
   final _themeService = ThemeService();
+  final UpdateService updateService = UpdateService(); // 改为公开
   ThemeMode _themeMode = ThemeMode.system;
   bool _autoCollapseSidebar = true;
-
+  bool hasCheckedForUpdates = false; // 修改为公共变量，供其他组件访问
+  
   @override
   void initState() {
     super.initState();
@@ -82,6 +88,75 @@ class MainAppState extends State<MainApp> {
     final autoCollapse = await _themeService.getAutoCollapseSidebar();
     setState(() => _autoCollapseSidebar = autoCollapse);
   }
+  
+  Future<bool> checkForUpdates() async {
+    // 如果已经检查过更新，则不再重复检查
+    if (hasCheckedForUpdates) {
+      print('已经检查过更新，跳过本次检查');
+      return false;
+    }
+    
+    try {
+      final updateInfo = await updateService.checkForUpdates();
+      
+      if (updateInfo != null && updateInfo['hasUpdate'] == true) {
+        hasCheckedForUpdates = true; // 设置标志，表示已检查过更新
+        
+        // 使用全局导航键获取有效的context
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          // 延迟显示更新对话框，确保MaterialApp完全初始化
+          Future.delayed(const Duration(seconds: 1), () {
+            showUpdateDialog(context, updateInfo);
+          });
+        }
+        return true; // 返回找到更新
+      } else {
+        hasCheckedForUpdates = true; // 标记已检查，但没有更新
+        return false; // 返回没有找到更新
+      }
+    } catch (e) {
+      print('检查更新时出错: $e');
+      return false; // 出错也返回 false
+    }
+  }
+  
+  void showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('发现新版本'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('当前版本: ${updateInfo['currentVersion']}'),
+              Text('最新版本: ${updateInfo['newVersion']}'),
+              const SizedBox(height: 8),
+              const Text('更新内容:'),
+              Text(updateInfo['updateNotes']),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('立即更新'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                updateService.downloadAndInstallUpdate(context, updateInfo['updateUrl'] ?? '');
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +164,7 @@ class MainAppState extends State<MainApp> {
       valueListenable: _themeService.themeNotifier,
       builder: (context, themeMode, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey, // 使用全局导航键
           title: '航图查看器',
           theme: ThemeData(
             useMaterial3: true,
@@ -123,11 +199,7 @@ class MainAppState extends State<MainApp> {
             ),
           ),
           themeMode: themeMode,  // 使用 themeMode 而不是 _themeMode
-          home: widget.isFirstRun 
-              ? const PolicyScreen(type: 'privacy', isFirstRun: true)
-              : widget.isLoggedIn 
-                  ? const HomeScreen() 
-                  : const LoginScreen(),
+          home: _buildHome(),
           routes: {
             '/login': (context) => const LoginScreen(),
             '/home': (context) => const HomeScreen(),
@@ -141,6 +213,32 @@ class MainAppState extends State<MainApp> {
           },
         );
       },
+    );
+  }
+  
+  Widget _buildHome() {
+    Widget homeWidget = widget.isFirstRun 
+        ? const PolicyScreen(type: 'privacy', isFirstRun: true)
+        : widget.isLoggedIn 
+            ? const HomeScreen() 
+            : const LoginScreen();
+            
+    // 使用Builder来确保有一个有效的context，并在构建后检查更新
+    return Builder(
+      builder: (context) {
+        // 在下一帧检查更新，确保MaterialApp完全初始化
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // 添加延迟，确保应用完全初始化
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            // 避免设置界面手动检查后又自动检查
+            if (!hasCheckedForUpdates) {
+              // 忽略返回值，因为自动检查不需要显示"已是最新版本"的提示
+              checkForUpdates();
+            }
+          });
+        });
+        return homeWidget;
+      }
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/cache_service.dart';
 import '../services/theme_service.dart';
+import '../services/update_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:math';
@@ -23,7 +24,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _cacheSize = '计算中...';
   ThemeMode _currentThemeMode = ThemeMode.system;
   final _themeService = ThemeService();
+  final _updateService = UpdateService();
   bool _autoCollapseSidebar = true;
+  bool _isCheckingForUpdates = false;
 
   @override
   void initState() {
@@ -251,6 +254,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           
           const Divider(height: 1),
           
+          // 应用部分
+          _buildSection(
+            icon: Icons.apps,
+            title: '应用',
+            children: [
+              _buildVersionTile(),
+              ListTile(
+                leading: const Icon(Icons.system_update),
+                title: const Text('检查更新'),
+                subtitle: const Text('检查是否有新版本可用'),
+                trailing: _isCheckingForUpdates 
+                  ? const SizedBox(
+                      width: 20, 
+                      height: 20, 
+                      child: CircularProgressIndicator(strokeWidth: 2.0)
+                    )
+                  : const Icon(Icons.chevron_right),
+                onTap: _isCheckingForUpdates ? null : _checkForUpdates,
+              ),
+            ],
+          ),
+          
+          const Divider(height: 1),
+          
           // 账号管理部分
           _buildSection(
             icon: Icons.account_circle,
@@ -335,7 +362,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () => _launchUrl('https://github.com/KNA7022/eaipchinaviewer'),
               ),
-              _buildVersionTile(),  // 使用新的版本信息组件
             ],
           ),
 
@@ -531,6 +557,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('无法打开链接: $url')),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    if (_isCheckingForUpdates) return;
+    
+    setState(() {
+      _isCheckingForUpdates = true;
+    });
+    
+    try {
+      // 使用MainApp中的方法检查更新
+      final mainApp = MainApp.of(context);
+      
+      if (mainApp != null) {
+        // 获取主应用状态
+        final mainAppState = mainApp as MainAppState;
+        
+        // 设置检查标识为false，以便进行新的检查
+        mainAppState.hasCheckedForUpdates = false;
+        
+        // 等待检查更新，并获取结果
+        final updateResult = await mainAppState.updateService.checkForUpdates();
+        
+        // 标记为已检查
+        mainAppState.hasCheckedForUpdates = true;
+        
+        // 根据结果显示相应提示
+        if (mounted) {
+          if (updateResult == null) {
+            // 检查失败
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('检查更新失败，请稍后再试')),
+            );
+          } else if (updateResult['hasUpdate'] == true) {
+            // 有更新，显示更新对话框
+            mainAppState.showUpdateDialog(context, updateResult);
+          } else {
+            // 没有更新
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已是最新版本')),
+            );
+          }
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _isCheckingForUpdates = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingForUpdates = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('检查更新时出错: $e')),
         );
       }
     }
