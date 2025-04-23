@@ -34,6 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSearching = false;
   final Map<String, List<AipItem>> _searchIndex = {};
   final _themeService = ThemeService();
+  final ScrollController _sidebarScrollController = ScrollController();
+  double _lastScrollPosition = 0;
+  // 记录每个版本的滚动位置
+  final Map<String, double> _scrollPositions = {};
+  final _sidebarScrollKey = const PageStorageKey<String>('sidebar_scroll');
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _sidebarScrollController.dispose();
     super.dispose();
   }
 
@@ -131,6 +137,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    // 保存当前版本的滚动位置
+    if (_sidebarScrollController.hasClients) {
+      _scrollPositions[_currentVersion] = _sidebarScrollController.offset;
+      _lastScrollPosition = _sidebarScrollController.offset;
+    }
+
     try {
       setState(() => _isLoading = true);
       _lastRefreshTime = DateTime.now();  // 记录刷新时间
@@ -138,49 +150,27 @@ class _HomeScreenState extends State<HomeScreen> {
       
       // 使用当前选中的版本刷新数据
       if (_currentVersion.isNotEmpty) {
-        await _loadDataForVersion(_currentVersion);
+        // 刷新不改变版本，所以不需要清除滚动位置
+        await _loadCurrentVersionData();
       } else {
         // 如果没有当前版本（极少情况），则获取当前生效版本
-        final api = ApiService();
-        final List<dynamic>? data = await api.getCurrentAipStructure();
-        
-        if (data != null) {
-          final items = data
-              .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
-              .toList();
-          final sortedItems = _sortAndProcessItems(items);
-          
-          _buildSearchIndex(sortedItems);
-          
-          setState(() {
-            _aipItems.clear();
-            _aipItems.addAll(sortedItems);
-            _searchController.clear();
-            _searchQuery = '';
-            _isSearching = false;
-            _filteredItems.clear();
-          });
-        } else {
-          final authService = AuthService();
-          await authService.clearAuthData();
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/login');
-          }
-        }
+        await _loadDefaultVersionData();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载失败: $e')),
         );
+        setState(() => _isLoading = false);
       }
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadDataForVersion(String version) async {
     if (!mounted) return;
+    
+    // 切换版本时清除滚动位置缓存，不保留上一个版本的位置
+    _lastScrollPosition = 0;
     
     setState(() {
       _isLoading = true;
@@ -215,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (!mounted) return;
       setState(() {
+        _currentVersion = version;
         _aipItems.clear();
         _aipItems.addAll(sortedItems);
         _buildSearchIndex(sortedItems);
@@ -238,6 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handlePdfSelect(String? pdfUrl, String? title) {
     if (pdfUrl != null) {
+      // 先保存当前的滚动位置
+      if (_sidebarScrollController.hasClients) {
+        _scrollPositions[_currentVersion] = _sidebarScrollController.offset;
+        _lastScrollPosition = _sidebarScrollController.offset;
+      }
+
       // 先设置为 null 强制重建组件
       setState(() {
         _selectedPdfUrl = null;
@@ -258,8 +255,37 @@ class _HomeScreenState extends State<HomeScreen> {
           _selectedPdfUrl = pdfUrl;
           _selectedTitle = title;
         });
+        
+        // 恢复滚动位置 (总是启用)
+        if (_isDrawerOpen) {
+          _restoreScrollPosition();
+        }
       });
     }
+  }
+  
+  // 添加单独的方法来恢复滚动位置
+  void _restoreScrollPosition() {
+    // 确保有有效的滚动位置
+    if (_lastScrollPosition <= 0 && _scrollPositions.containsKey(_currentVersion)) {
+      _lastScrollPosition = _scrollPositions[_currentVersion] ?? 0;
+    }
+    
+    // 使用双重延迟确保在布局完成后恢复滚动位置
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _sidebarScrollController.hasClients && _lastScrollPosition > 0) {
+          try {
+            // 确保不超出边界
+            final maxScrollExtent = _sidebarScrollController.position.maxScrollExtent;
+            final targetPosition = _lastScrollPosition.clamp(0.0, maxScrollExtent);
+            _sidebarScrollController.jumpTo(targetPosition);
+          } catch (e) {
+            print('恢复滚动位置失败: $e');
+          }
+        }
+      });
+    });
   }
 
   List<AipItem> _sortAndProcessItems(List<AipItem> items) {
@@ -330,6 +356,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleSearch(String query) {
+    // 搜索时总是保存当前的滚动位置
+    if (_sidebarScrollController.hasClients) {
+      _scrollPositions[_currentVersion] = _sidebarScrollController.offset;
+      _lastScrollPosition = _sidebarScrollController.offset;
+    }
+    
     setState(() {
       _searchQuery = query.toLowerCase();
       _isSearching = _searchQuery.isNotEmpty;
@@ -368,8 +400,22 @@ class _HomeScreenState extends State<HomeScreen> {
             b.nameCn.toLowerCase().contains(word)).length;
           return bRelevance.compareTo(aRelevance);
         });
+      } else if (_isDrawerOpen) {
+        // 如果取消搜索，则恢复之前的位置
+        _lastScrollPosition = _scrollPositions[_currentVersion] ?? 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _restoreScrollPosition();
+        });
+        return;
       }
     });
+    
+    // 搜索后，始终滚动到顶部
+    if (_sidebarScrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _sidebarScrollController.jumpTo(0);
+      });
+    }
   }
 
   Widget _buildListItem(BuildContext context, AipItem item) {
@@ -596,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // 抽屉开关按钮
               IconButton(
                 icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
-                onPressed: () => setState(() => _isDrawerOpen = !_isDrawerOpen),
+                onPressed: _toggleDrawer,
               ),
               // 右侧主内容区
               Expanded(
@@ -656,6 +702,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
+                    key: _sidebarScrollKey,
+                    controller: _sidebarScrollController,
                     children: (_isSearching ? _filteredItems : _aipItems)
                         .map((item) => _buildListItem(context, item))
                         .toList(),
@@ -664,6 +712,111 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  void _toggleDrawer() {
+    // 保存当前的滚动位置
+    if (_isDrawerOpen && _sidebarScrollController.hasClients) {
+      _scrollPositions[_currentVersion] = _sidebarScrollController.offset;
+      _lastScrollPosition = _sidebarScrollController.offset;
+    }
+    
+    final wasOpen = _isDrawerOpen;
+    setState(() => _isDrawerOpen = !_isDrawerOpen);
+    
+    // 如果打开了抽屉，尝试恢复滚动位置
+    if (!wasOpen) {
+      _lastScrollPosition = _scrollPositions[_currentVersion] ?? 0;
+      _restoreScrollPosition();
+    }
+  }
+
+  // 添加用于加载当前版本数据的方法
+  Future<void> _loadCurrentVersionData() async {
+    if (!mounted) return;
+    
+    try {
+      final api = ApiService();
+      final List<dynamic>? data = await api.getAipStructureForVersion(_currentVersion);
+      
+      if (!mounted) return;
+
+      if (data == null) {
+        // token失效，直接清除认证数据并跳转到登录页面
+        final authService = AuthService();
+        await authService.clearAuthData();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/login');
+        return;
+      }
+
+      final items = data.map((item) => 
+        AipItem.fromJson(item as Map<String, dynamic>)
+      ).toList();
+      
+      final sortedItems = _sortAndProcessItems(items);
+      
+      if (!mounted) return;
+      setState(() {
+        _aipItems.clear();
+        _aipItems.addAll(sortedItems);
+        _buildSearchIndex(sortedItems);
+        _isLoading = false;
+      });
+      
+      // 恢复滚动位置
+      if (_isDrawerOpen) {
+        _restoreScrollPosition();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      throw e;
+    }
+  }
+
+  // 添加用于加载默认版本数据的方法
+  Future<void> _loadDefaultVersionData() async {
+    if (!mounted) return;
+    
+    try {
+      final api = ApiService();
+      final List<dynamic>? data = await api.getCurrentAipStructure();
+      
+      if (data != null) {
+        final items = data
+            .map((item) => AipItem.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final sortedItems = _sortAndProcessItems(items);
+        
+        _buildSearchIndex(sortedItems);
+        
+        setState(() {
+          _aipItems.clear();
+          _aipItems.addAll(sortedItems);
+          _searchController.clear();
+          _searchQuery = '';
+          _isSearching = false;
+          _filteredItems.clear();
+          _isLoading = false;
+        });
+        
+        // 恢复滚动位置
+        if (_isDrawerOpen) {
+          _restoreScrollPosition();
+        }
+      } else {
+        final authService = AuthService();
+        await authService.clearAuthData();
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      throw e;
+    }
   }
 }
 
