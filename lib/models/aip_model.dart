@@ -94,7 +94,7 @@ class AipItem {
   }
 
   int compareTo(AipItem other) {
-    // 机场排序
+    // 机场排序 - 只比较ICAO码部分
     final thisCode = airportCode;
     final otherCode = other.airportCode;
     if (thisCode != null && otherCode != null) {
@@ -161,6 +161,7 @@ class AipItem {
       return 0;
     });
 
+    // ENR 项的处理保持不变
     print('排序后的ENR项：');
     for (var item in enrItems) {
       print('  ${item.nameCn}');
@@ -209,49 +210,101 @@ class AipItem {
       }
     }
 
-    // 处理机场项
-    final airportCodeRegex = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})\b');
+    // --------------- 机场项处理逻辑 ---------------
     
-    // 第一阶段：收集所有父项信息
-    final airportParentItems = airportItems.where(
-      (item) => airportCodeRegex.matchAsPrefix(item.nameCn)?.end == item.nameCn.length
-    ).toList();
-
-    // 创建机场父项
-    for (final parentItem in airportParentItems) {
-      final code = parentItem.airportCode!;
-      airportMap[code] = parentItem.copyWith(
-        children: [],
-        pdfPath: parentItem.pdfPath,
-        // 父项的修改状态设为 'N'，后续通过子项状态动态判断
-        isModified: 'N',
-      );
-    }
-
-    // 第二阶段：处理子项
+    // 正则表达式匹配ICAO码
+    final icaoCodeRegex = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})\b');
+    
+    // 正则表达式匹配 "ICAO-机场名" 格式 (如 "ZBAA-北京/首都")
+    final fullAirportNameRegex = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})-([^-\d][^-]*?)$');
+    
+    // 正则表达式匹配子项格式 (如 "ZBAA-1A", "ZBAA-6", "ZBAA-7B10", "ZGOW-20B")
+    final childItemRegex = RegExp(r'^(Z[PBGHLJSUWY][A-Z]{2})-(\d+[A-Z0-9]*)');
+    
+    // 创建一个收集机场名称的映射 (ICAO码 -> 机场名)
+    final Map<String, String> airportNames = {};
+    
+    // 首先遍历所有项目，找出符合 "ICAO-机场名" 格式的条目，提取机场名
     for (final item in airportItems) {
-      final code = item.airportCode;
-      if (code == null) continue;
-
-      if (!airportMap.containsKey(code)) {
-        airportMap[code] = AipItem(
-          nameCn: code,
+      final fullNameMatch = fullAirportNameRegex.firstMatch(item.nameCn);
+      if (fullNameMatch != null) {
+        final icaoCode = fullNameMatch.group(1)!;
+        final airportName = fullNameMatch.group(2)!;
+        airportNames[icaoCode] = airportName;
+      }
+    }
+    
+    // 创建临时结构以区分父项和子项
+    final Map<String, List<AipItem>> airportChildren = {};
+    final Map<String, AipItem> airportParents = {};
+    
+    // 分类处理所有机场相关项
+    for (final item in airportItems) {
+      // 提取ICAO码
+      final icaoMatch = icaoCodeRegex.firstMatch(item.nameCn);
+      if (icaoMatch == null) continue;
+      
+      final icaoCode = icaoMatch.group(1)!;
+      
+      // 初始化子项列表（如果不存在）
+      airportChildren.putIfAbsent(icaoCode, () => []);
+      
+      // 检查是否是符合 "ICAO-机场名" 格式的父项
+      final fullNameMatch = fullAirportNameRegex.firstMatch(item.nameCn);
+      if (fullNameMatch != null) {
+        // 这是父项，记录其 PDF 路径
+        airportParents[icaoCode] = item;
+        continue;
+      }
+      
+      // 检查是否是符合 "ICAO-子项编号" 格式的子项
+      final childMatch = childItemRegex.firstMatch(item.nameCn);
+      if (childMatch != null) {
+        // 这是子项，添加到对应的子项列表
+        airportChildren[icaoCode]!.add(item);
+      }
+    }
+    
+    // 构建最终的机场层次结构
+    for (final icaoCode in {...airportParents.keys, ...airportChildren.keys}) {
+      // 首先获取机场名（如果已知）
+      final airportName = airportNames[icaoCode] ?? '';
+      
+      // 构建父项名称格式为 "ICAO-机场名"
+      final parentName = airportName.isEmpty ? icaoCode : '$icaoCode-$airportName';
+      
+      // 获取现有的父项（如果存在）或创建新的父项
+      AipItem parentItem;
+      if (airportParents.containsKey(icaoCode)) {
+        // 使用现有父项并更新其名称
+        parentItem = airportParents[icaoCode]!.copyWith(
+          nameCn: parentName,
+          children: [],
+        );
+      } else {
+        // 创建新的父项（没有PDF路径）
+        parentItem = AipItem(
+          nameCn: parentName,
           isModified: 'N',
           pdfPath: null,
           children: [],
         );
       }
-
-      if (item.nameCn != code) {
-        airportMap[code] = airportMap[code]!.copyWith(
-          children: [...airportMap[code]!.children, item],
+      
+      // 添加子项（如果有）
+      if (airportChildren.containsKey(icaoCode)) {
+        parentItem = parentItem.copyWith(
+          children: airportChildren[icaoCode]!,
         );
       }
+      
+      // 将构建的父项添加到结果中
+      airportMap[icaoCode] = parentItem;
     }
-
+    
     // 添加机场父项到结果
     result.addAll(airportMap.values);
-
+    
     // 添加剩余项并排序
     result
       ..addAll(items.where((item) => !processedItems.contains(item)))
