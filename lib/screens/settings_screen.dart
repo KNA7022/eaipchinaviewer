@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _cacheSize = '计算中...';
   ThemeMode _currentThemeMode = ThemeMode.system;
   final _themeService = ThemeService();
+  bool _autoCollapseSidebar = true;
 
   @override
   void initState() {
@@ -211,6 +212,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('主题模式'),
                 subtitle: Text(_getThemeModeText()),
                 onTap: _showThemeModeDialog,
+              ),
+              // 使用 ValueListenableBuilder 来实时响应自动收起侧边栏设置的变化
+              ValueListenableBuilder<bool>(
+                valueListenable: _themeService.autoCollapseNotifier,
+                builder: (context, autoCollapse, child) {
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.view_sidebar),
+                    title: const Text('打开PDF时自动收起侧边栏'),
+                    subtitle: const Text('查看航图时自动隐藏左侧导航栏'),
+                    value: autoCollapse,
+                    onChanged: (value) {
+                      // 直接设置值，不需要等待setState
+                      _themeService.setAutoCollapseSidebar(value);
+                    },
+                  );
+                },
               ),
             ],
           ),

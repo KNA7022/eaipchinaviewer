@@ -63,17 +63,24 @@ class MainApp extends StatefulWidget {
 // 公开的 MainAppState
 class MainAppState extends State<MainApp> {
   final _themeService = ThemeService();
-  ThemeMode _themeMode = ThemeMode.system;  // 定义 _themeMode
+  ThemeMode _themeMode = ThemeMode.system;
+  bool _autoCollapseSidebar = true;
 
   @override
   void initState() {
     super.initState();
     _loadThemeMode();
+    _loadAutoCollapseSidebar();
   }
 
   Future<void> _loadThemeMode() async {
     final mode = await _themeService.getThemeMode();
     setState(() => _themeMode = mode);
+  }
+  
+  Future<void> _loadAutoCollapseSidebar() async {
+    final autoCollapse = await _themeService.getAutoCollapseSidebar();
+    setState(() => _autoCollapseSidebar = autoCollapse);
   }
 
   @override

@@ -6,6 +6,8 @@ class ThemeService {
   
   // 添加 ValueNotifier 来监听主题变化
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+  // 自动收起侧边栏设置通知器
+  final ValueNotifier<bool> autoCollapseNotifier = ValueNotifier(true);
 
   // 单例模式
   static final ThemeService _instance = ThemeService._internal();
@@ -13,30 +15,37 @@ class ThemeService {
   ThemeService._internal();
 
   Future<void> init() async {
-    final mode = await getThemeMode();
-    themeNotifier.value = mode;
+    final prefs = await SharedPreferences.getInstance();
+    final themeIndex = prefs.getInt('theme_mode') ?? 0;
+    themeNotifier.value = ThemeMode.values[themeIndex];
+    
+    // 初始化自动收起侧边栏设置，默认为true
+    final autoCollapse = prefs.getBool('auto_collapse_sidebar') ?? true;
+    autoCollapseNotifier.value = autoCollapse;
   }
 
   Future<ThemeMode> getThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_themeKey);
-    return _parseThemeMode(value);
+    final themeIndex = prefs.getInt('theme_mode') ?? 0;
+    return ThemeMode.values[themeIndex];
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_themeKey, mode.toString());
-    themeNotifier.value = mode;  // 更新通知器
+    await prefs.setInt('theme_mode', mode.index);
+    themeNotifier.value = mode;
   }
-
-  ThemeMode _parseThemeMode(String? value) {
-    switch (value) {
-      case 'ThemeMode.light':
-        return ThemeMode.light;
-      case 'ThemeMode.dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
+  
+  // 获取自动收起侧边栏设置
+  Future<bool> getAutoCollapseSidebar() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('auto_collapse_sidebar') ?? true;
+  }
+  
+  // 设置自动收起侧边栏
+  Future<void> setAutoCollapseSidebar(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('auto_collapse_sidebar', value);
+    autoCollapseNotifier.value = value;
   }
 }

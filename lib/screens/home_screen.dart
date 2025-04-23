@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../models/version_model.dart';  
 import 'package:intl/intl.dart';  
 import '../screens/weather_screen.dart'; 
+import '../services/theme_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   bool _isSearching = false;
   final Map<String, List<AipItem>> _searchIndex = {};
+  final _themeService = ThemeService();
 
   @override
   void initState() {
@@ -242,6 +244,14 @@ class _HomeScreenState extends State<HomeScreen> {
         _selectedTitle = null;
       });
       
+      // 使用监听器获取最新的设置值
+      final autoCollapse = _themeService.autoCollapseNotifier.value;
+      if (autoCollapse) {
+        setState(() {
+          _isDrawerOpen = false;
+        });
+      }
+      
       // 等待下一帧再设置新值
       WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() {
@@ -448,152 +458,156 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('航图查看器'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.thunderstorm),
-            tooltip: '机场天气',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const WeatherScreen(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _themeService.autoCollapseNotifier,
+      builder: (context, autoCollapseSidebar, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('航图查看器'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.thunderstorm),
+                tooltip: '机场天气',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WeatherScreen(),
+                  ),
+                ),
               ),
-            ),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.calendar_today),
-            tooltip: '选择版本号',
-            initialValue: _currentVersion,
-            onSelected: _handleVersionChange,
-            itemBuilder: (context) => _versions.map((version) {
-              final bool isCurrent = version.status == 'CURRENTLY_ISSUE';
-              final bool isExpired = version.effectiveDate.isBefore(DateTime.now());
-              final bool isUpcoming = version.effectiveDate.isAfter(DateTime.now());
-              
-              final statusConfig = isCurrent
-                  ? _StatusConfig('当前版本', Colors.green)
-                  : isExpired
-                      ? _StatusConfig('已失效', Colors.grey)
-                      : isUpcoming
-                          ? _StatusConfig('即将生效', Colors.orange)
-                          : _StatusConfig('未知状态', Colors.grey);
-              
-
-              return PopupMenuItem(
-                value: version.name,
-                child: Container(
-                  width: 280,
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.calendar_today),
+                tooltip: '选择版本号',
+                initialValue: _currentVersion,
+                onSelected: _handleVersionChange,
+                itemBuilder: (context) => _versions.map((version) {
+                  final bool isCurrent = version.status == 'CURRENTLY_ISSUE';
+                  final bool isExpired = version.effectiveDate.isBefore(DateTime.now());
+                  final bool isUpcoming = version.effectiveDate.isAfter(DateTime.now());
+                  
+                  final statusConfig = isCurrent
+                      ? _StatusConfig('当前版本', Colors.green)
+                      : isExpired
+                          ? _StatusConfig('已失效', Colors.grey)
+                          : isUpcoming
+                              ? _StatusConfig('即将生效', Colors.orange)
+                              : _StatusConfig('未知状态', Colors.grey);
+                  
+                  return PopupMenuItem(
+                    value: version.name,
+                    child: Container(
+                      width: 280,
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  version.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusConfig.color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: statusConfig.color),
-                                  ),
-                                  child: Text(
-                                    statusConfig.text,
-                                    style: TextStyle(
-                                      color: statusConfig.color,
-                                      fontSize: 12,
+                                Row(
+                                  children: [
+                                    Text(
+                                      version.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: statusConfig.color.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: statusConfig.color),
+                                      ),
+                                      child: Text(
+                                        statusConfig.text,
+                                        style: TextStyle(
+                                          color: statusConfig.color,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                    children: [
+                                      const TextSpan(text: '生效: '),
+                                      TextSpan(
+                                        text: DateFormat('yyyy-MM-dd').format(version.effectiveDate),
+                                        style: const TextStyle(fontWeight: FontWeight.w500),
+                                      ),
+                                      const TextSpan(text: '  失效: '),
+                                      TextSpan(
+                                        text: version.deadlineDate != null 
+                                            ? DateFormat('yyyy-MM-dd').format(version.deadlineDate!)
+                                            : '${DateFormat('yyyy-MM-dd').format(version.effectiveDate.add(const Duration(days: 28)))} (预计)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          fontStyle: version.deadlineDate == null ? FontStyle.italic : FontStyle.normal,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            RichText(
-                              text: TextSpan(
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                                children: [
-                                  const TextSpan(text: '生效: '),
-                                  TextSpan(
-                                    text: DateFormat('yyyy-MM-dd').format(version.effectiveDate),
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
-                                  ),
-                                  const TextSpan(text: '  失效: '),
-                                  TextSpan(
-                                    text: version.deadlineDate != null 
-                                        ? DateFormat('yyyy-MM-dd').format(version.deadlineDate!)
-                                        : '${DateFormat('yyyy-MM-dd').format(version.effectiveDate.add(const Duration(days: 28)))} (预计)',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontStyle: version.deadlineDate == null ? FontStyle.italic : FontStyle.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          ),
+                          if (_currentVersion == version.name)
+                            Icon(
+                              Icons.check,
+                              color: statusConfig.color,
+                              size: 20,
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                      if (_currentVersion == version.name)
-                        Icon(
-                          Icons.check,
-                          color: statusConfig.color,
-                          size: 20,
-                        ),
-                    ],
-                  ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: (_isLoading || !_canRefresh()) ? null : _loadData,
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () => Navigator.pushNamed(context, '/settings'),
+              ),
+            ],
+          ),
+          body: Row(
+            children: [
+              // 左侧抽屉
+              if (_isDrawerOpen)
+                SizedBox(
+                  width: _drawerWidth,
+                  child: _buildDrawer(),
                 ),
-              );
-            }).toList(),
+              // 抽屉开关按钮
+              IconButton(
+                icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
+                onPressed: () => setState(() => _isDrawerOpen = !_isDrawerOpen),
+              ),
+              // 右侧主内容区
+              Expanded(
+                child: _selectedPdfUrl != null
+                    ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
+                    : const Center(child: Text('请选择要查看的文档')),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: (_isLoading || !_canRefresh()) ? null : _loadData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.pushNamed(context, '/settings'),
-          ),
-        ],
-      ),
-      body: Row(
-        children: [
-          // 左侧抽屉
-          if (_isDrawerOpen)
-            SizedBox(
-              width: _drawerWidth,
-              child: _buildDrawer(),
-            ),
-          // 抽屉开关按钮
-          IconButton(
-            icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
-            onPressed: () => setState(() => _isDrawerOpen = !_isDrawerOpen),
-          ),
-          // 右侧主内容区
-          Expanded(
-            child: _selectedPdfUrl != null
-                ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
-                : const Center(child: Text('请选择要查看的文档')),
-          ),
-        ],
-      ),
+        );
+      }
     );
   }
 
