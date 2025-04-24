@@ -54,10 +54,14 @@ class UpdateService {
             'newVersion': updateInfo['version'],
             'updateNotes': updateInfo['notic'] ?? '',
             'updateUrl': updateInfo['url'] ?? '',
+            'sponsors': updateInfo['Sponsors'] ?? '',
           };
         } else {
           _isCheckingForUpdates = false;
-          return {'hasUpdate': false};
+          return {
+            'hasUpdate': false,
+            'sponsors': updateInfo['Sponsors'] ?? '',
+          };
         }
       }
     } catch (e) {
@@ -66,6 +70,31 @@ class UpdateService {
     
     _isCheckingForUpdates = false;
     return null;
+  }
+  
+  Future<String> getSponsors() async {
+    try {
+      // 检查网络连接状态
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        print('没有网络连接');
+        return '';
+      }
+      
+      final response = await http.get(Uri.parse(_updateUrl));
+      
+      if (response.statusCode == 200) {
+        // 确保使用UTF-8解码
+        final String responseBody = utf8.decode(response.bodyBytes);
+        final updateInfo = json.decode(responseBody);
+        
+        return updateInfo['Sponsors'] ?? '';
+      }
+    } catch (e) {
+      print('获取捐助者信息失败: $e');
+    }
+    
+    return '';
   }
   
   bool _isNewerVersion(String currentVersion, String newVersion) {

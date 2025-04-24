@@ -27,12 +27,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _updateService = UpdateService();
   bool _autoCollapseSidebar = true;
   bool _isCheckingForUpdates = false;
+  String _sponsors = '加载中...';  // 添加捐助者信息变量
 
   @override
   void initState() {
     super.initState();
     _calculateCacheSize();
     _loadThemeMode();
+    _loadSponsors();  // 加载捐助者信息
   }
 
   Future<void> _loadThemeMode() async {
@@ -194,6 +196,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // 添加加载捐助者信息的方法
+  Future<void> _loadSponsors() async {
+    try {
+      final sponsors = await _updateService.getSponsors();
+      if (mounted) {
+        setState(() {
+          _sponsors = sponsors.isEmpty ? '暂无捐助者' : sponsors;
+        });
+      }
+    } catch (e) {
+      print('加载捐助者信息失败: $e');
+      if (mounted) {
+        setState(() {
+          _sponsors = '加载失败';
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -272,6 +293,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     )
                   : const Icon(Icons.chevron_right),
                 onTap: _isCheckingForUpdates ? null : _checkForUpdates,
+              ),
+              // 添加捐助者信息部分
+              ListTile(
+                leading: const Icon(Icons.favorite, color: Colors.red),
+                title: const Text('捐助者名单'),
+                subtitle: Text(_sponsors),
+                onTap: () => _showSponsorsDialog(context),
               ),
             ],
           ),
@@ -589,6 +617,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // 标记为已检查
         mainAppState.hasCheckedForUpdates = true;
         
+        // 更新捐助者信息
+        if (updateResult != null && updateResult.containsKey('sponsors')) {
+          setState(() {
+            _sponsors = updateResult['sponsors'] ?? '暂无捐助者';
+          });
+        }
+        
         // 根据结果显示相应提示
         if (mounted) {
           if (updateResult == null) {
@@ -623,5 +658,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  // 添加显示捐助者对话框的方法
+  void _showSponsorsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.favorite, color: Colors.red),
+              const SizedBox(width: 10),
+              const Text('捐助者名单'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '感谢以下捐助者对本项目的支持:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              _sponsors.isEmpty
+                ? const Text('暂无捐助者')
+                : Text(_sponsors),
+              const SizedBox(height: 16),
+              const Text(
+                '如果您喜欢这个应用，可以通过以下方式支持:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => _launchUrl('https://github.com/KNA7022/eaipchinaviewer'),
+                child: const Text(
+                  '1. 在GitHub上给项目点Star',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    decoration: TextDecoration.underline,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '2. 分享给更多的人使用',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('关闭'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('刷新'),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _loadSponsors();
+                _showSponsorsDialog(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }
