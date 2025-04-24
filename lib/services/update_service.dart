@@ -168,54 +168,137 @@ class UpdateService {
       bool permissionsGranted = false;
       
       if (Platform.isAndroid) {
-        // 请求存储权限
-        if (await Permission.storage.request().isGranted) {
+        // 针对不同Android版本使用不同的权限策略
+        if (await Permission.requestInstallPackages.request().isGranted) {
+          print('已获取安装未知应用权限');
           permissionsGranted = true;
-        }
-        
-        // Android 10及以上可能需要所有文件访问权限
-        if (!permissionsGranted && Platform.isAndroid) {
-          if (await Permission.manageExternalStorage.request().isGranted) {
+        } else {
+          print('尝试获取安装包权限失败，尝试获取存储权限');
+          
+          // 请求存储权限
+          if (await Permission.storage.request().isGranted) {
+            print('已获取存储权限');
             permissionsGranted = true;
+          }
+          
+          // Android 10及以上可能需要所有文件访问权限
+          if (!permissionsGranted && Platform.isAndroid) {
+            final status = await Permission.manageExternalStorage.request();
+            if (status.isGranted) {
+              print('已获取管理外部存储权限');
+              permissionsGranted = true;
+            } else {
+              print('管理外部存储权限请求结果: $status');
+            }
           }
         }
         
-        // 如果权限仍未获取，显示错误
+        // 如果权限仍未获取，显示更详细的错误
         if (!permissionsGranted) {
           _closeProgressDialog(context);
-          _showErrorDialog('需要存储权限才能下载更新，请前往系统设置开启权限');
+          _showErrorDetailDialog(
+            context,
+            '权限不足，无法下载安装更新',
+            '可能需要您前往系统设置手动开启以下权限：\n'
+            '1. 允许安装来自未知来源的应用\n'
+            '2. 存储空间访问权限\n\n'
+            '您也可以直接下载APK手动安装，点击下方按钮前往下载页面',
+            apkUrl
+          );
           return;
         }
       }
       
-      // 获取下载目录
-      Directory? directory;
+      // 尝试两种不同的下载方法
+      final downloadResult = await _tryDownloadWithMultipleMethods(context, apkUrl, progressValue);
       
-      try {
-        // 获取系统下载目录
-        if (Platform.isAndroid) {
-          directory = Directory('/storage/emulated/0/Download');
-          if (!await directory.exists()) {
-            await directory.create(recursive: true);
-          }
-        } else {
-          directory = await getApplicationDocumentsDirectory();
-        }
-      } catch (e) {
-        // 回退到应用文档目录
-        directory = await getApplicationDocumentsDirectory();
-      }
-      
-      if (directory == null) {
+      if (downloadResult == null || downloadResult.isEmpty) {
         _closeProgressDialog(context);
-        _showErrorDialog('无法获取存储目录');
+        _showErrorDialog('下载失败，请尝试使用浏览器下载');
         return;
       }
       
-      final filePath = '${directory.path}/eaipchinaviewer_update.apk';
-      final file = File(filePath);
+      print('APK下载完成: $downloadResult');
       
-      print('开始下载APK: $apkUrl 到 $filePath');
+      // 关闭进度对话框
+      _closeProgressDialog(context);
+      
+      // 尝试多种方法安装APK
+      _tryInstallApk(context, downloadResult, apkUrl);
+      
+    } catch (e) {
+      print('更新过程出错: $e');
+      _closeProgressDialog(context);
+      _showErrorDialog('更新过程出错: $e');
+    }
+  }
+  
+  // 尝试多种方法下载APK文件
+  Future<String?> _tryDownloadWithMultipleMethods(
+    BuildContext context, 
+    String apkUrl, 
+    ValueNotifier<double> progressValue
+  ) async {
+    // 先尝试直接下载到Download目录
+    try {
+      final filePath = await _downloadToPublicDirectory(apkUrl, progressValue);
+      if (filePath != null) {
+        return filePath;
+      }
+    } catch (e) {
+      print('下载到公共目录失败: $e');
+    }
+    
+    // 如果第一种方法失败，尝试下载到应用私有目录
+    try {
+      final filePath = await _downloadToPrivateDirectory(apkUrl, progressValue);
+      if (filePath != null) {
+        return filePath;
+      }
+    } catch (e) {
+      print('下载到私有目录失败: $e');
+    }
+    
+    return null;
+  }
+  
+  // 下载APK到公共下载目录
+  Future<String?> _downloadToPublicDirectory(String apkUrl, ValueNotifier<double> progressValue) async {
+    Directory? directory;
+    
+    try {
+      // 获取系统下载目录
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          await directory.create(recursive: true);
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+    } catch (e) {
+      print('获取公共下载目录失败: $e');
+      return null;
+    }
+    
+    if (directory == null) {
+      return null;
+    }
+    
+    final filePath = '${directory.path}/eaipchinaviewer_update.apk';
+    final file = File(filePath);
+    
+    // 如果文件已存在，先删除它
+    if (await file.exists()) {
+      try {
+        await file.delete();
+        print('删除已存在的APK文件');
+      } catch (e) {
+        print('删除已存在的APK文件失败: $e');
+      }
+    }
+    
+    try {
       final client = http.Client();
       
       try {
@@ -243,39 +326,203 @@ class UpdateService {
           await sink.flush();
           await sink.close();
           
-          print('APK下载完成: $filePath');
+          print('APK下载完成(公共目录): $filePath，总大小: ${await file.length()} 字节');
           
-          // 关闭进度对话框
-          _closeProgressDialog(context);
+          // 延迟一下，确保文件写入完成
+          await Future.delayed(const Duration(seconds: 1));
           
-          // 检查文件是否存在
-          if (await file.exists()) {
-            // 直接打开APK，让系统安装器处理
-            final result = await OpenFile.open(filePath);
-            
-            if (result.type != ResultType.done) {
-              print('自动打开安装包失败: ${result.message}');
-              _showFileLocationDialog(context, filePath);
-            }
-          } else {
-            _showErrorDialog('下载完成，但无法找到文件：$filePath');
+          if (await file.exists() && await file.length() > 0) {
+            return filePath;
           }
-        } else {
-          _closeProgressDialog(context);
-          _showErrorDialog('下载失败，服务器返回状态码：${response.statusCode}');
         }
-      } catch (e) {
-        print('下载过程错误: $e');
-        _closeProgressDialog(context);
-        _showErrorDialog('下载过程中出错: $e');
       } finally {
         client.close();
       }
     } catch (e) {
-      print('更新过程出错: $e');
-      _closeProgressDialog(context);
-      _showErrorDialog('更新过程出错: $e');
+      print('下载到公共目录错误: $e');
     }
+    
+    return null;
+  }
+  
+  // 下载APK到应用私有目录
+  Future<String?> _downloadToPrivateDirectory(String apkUrl, ValueNotifier<double> progressValue) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/update.apk';
+      final file = File(filePath);
+      
+      // 如果文件已存在，先删除它
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (e) {
+          print('删除已存在的APK文件失败: $e');
+        }
+      }
+      
+      final client = http.Client();
+      
+      try {
+        final request = http.Request('GET', Uri.parse(apkUrl));
+        final response = await client.send(request);
+        
+        if (response.statusCode == 200) {
+          final contentLength = response.contentLength ?? 0;
+          
+          // 创建文件并准备写入
+          final sink = file.openWrite();
+          int receivedBytes = 0;
+          
+          await response.stream.listen((bytes) {
+            sink.add(bytes);
+            receivedBytes += bytes.length;
+            
+            // 计算并更新进度
+            if (contentLength > 0) {
+              progressValue.value = receivedBytes / contentLength;
+              print('下载进度: ${(progressValue.value * 100).toStringAsFixed(1)}%');
+            }
+          }).asFuture();
+          
+          await sink.flush();
+          await sink.close();
+          
+          print('APK下载完成(私有目录): $filePath，总大小: ${await file.length()} 字节');
+          
+          // 延迟一下，确保文件写入完成
+          await Future.delayed(const Duration(seconds: 1));
+          
+          if (await file.exists() && await file.length() > 0) {
+            return filePath;
+          }
+        }
+      } finally {
+        client.close();
+      }
+    } catch (e) {
+      print('下载到私有目录错误: $e');
+    }
+    
+    return null;
+  }
+  
+  // 尝试多种方法安装APK
+  Future<void> _tryInstallApk(BuildContext context, String filePath, String apkUrl) async {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      _showErrorDialog('安装文件不存在: $filePath');
+      return;
+    }
+    
+    print('尝试安装APK: $filePath');
+    
+    try {
+      // 第一种方法：使用OpenFile
+      final result = await OpenFile.open(filePath);
+      
+      if (result.type == ResultType.done) {
+        print('使用OpenFile打开APK成功');
+        return;
+      }
+      
+      print('使用OpenFile打开APK失败: ${result.message}');
+      
+      // 第二种方法：尝试使用URL启动（部分设备上可能有效）
+      if (Platform.isAndroid) {
+        try {
+          final apkUri = Uri.file(filePath);
+          if (await canLaunchUrl(apkUri)) {
+            print('尝试使用URL启动器打开APK');
+            await launchUrl(apkUri, mode: LaunchMode.externalApplication);
+            return;
+          }
+        } catch (e) {
+          print('URL启动失败: $e');
+        }
+      }
+      
+      // 如果所有自动方法都失败，显示手动安装对话框
+      _showManualInstallDialog(context, filePath, apkUrl);
+    } catch (e) {
+      print('尝试安装APK过程中出错: $e');
+      _showManualInstallDialog(context, filePath, apkUrl);
+    }
+  }
+  
+  // 显示手动安装对话框（增强版）
+  void _showManualInstallDialog(BuildContext context, String filePath, String originalUrl) {
+    final ctx = navigatorKey.currentContext ?? context;
+    if (ctx == null) return;
+    
+    showDialog(
+      context: ctx,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('需要手动安装'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('已下载安装包，但需要手动完成安装：'),
+              const SizedBox(height: 12),
+              Text('文件位置: $filePath', style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.folder),
+                    label: const Text('打开文件位置'),
+                    onPressed: () async {
+                      try {
+                        // 尝试打开文件所在的文件夹
+                        final directory = Directory(filePath.substring(0, filePath.lastIndexOf('/')));
+                        final uri = Uri.directory(directory.path);
+                        
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        } else {
+                          // 如果不能直接打开文件夹，至少尝试再次打开文件
+                          await OpenFile.open(filePath);
+                        }
+                      } catch (e) {
+                        print('打开文件位置失败: $e');
+                      }
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: const Text('浏览器下载'),
+                    onPressed: () async {
+                      final uri = Uri.parse(originalUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '提示：\n1. 点击打开文件位置后，找到并点击APK文件\n'
+                '2. 系统可能会提示允许来自此来源的应用安装\n'
+                '3. 如果遇到问题，可以使用浏览器下载并安装',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('关闭'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
   
   void _closeProgressDialog(BuildContext context) {
@@ -336,6 +583,77 @@ class UpdateService {
               child: const Text('确定'),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _showErrorDetailDialog(BuildContext context, String title, String message, String apkUrl) {
+    final ctx = navigatorKey.currentContext ?? context;
+    if (ctx == null) return;
+    
+    showDialog(
+      context: ctx,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: const Text('浏览器下载'),
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      // 使用浏览器打开下载链接
+                      final uri = Uri.parse(apkUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (ctx.mounted) {
+                          _showErrorDialog('无法打开浏览器下载链接');
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '提示：下载完成后请点击APK文件进行安装',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('去设置'),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                // 尝试打开应用设置页面
+                try {
+                  await openAppSettings();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    _showErrorDialog('无法打开设置页面');
+                  }
+                }
               },
             ),
           ],
