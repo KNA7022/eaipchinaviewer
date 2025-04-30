@@ -298,7 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.favorite, color: Colors.red),
                 title: const Text('捐助者名单'),
-                subtitle: Text(_sponsors),
+                subtitle: Text('点击查看详细名单'),
                 onTap: () => _showSponsorsDialog(context),
               ),
             ],
