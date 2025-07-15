@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,7 +12,125 @@ import 'package:open_file/open_file.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../main.dart'; // 导入主文件以使用全局导航键
 
+class DownloadTask {
+  final String version;
+  final String packageVersion;
+  double progress;
+  bool isDownloading;
+  bool isCancelled = false;
+  final VoidCallback? onCancelled;
+
+  DownloadTask({
+    required this.version,
+    required this.packageVersion,
+    this.progress = 0.0,
+    this.isDownloading = false,
+    this.onCancelled,
+  });
+
+  void cancel({bool showCancelledSnackBar = true, BuildContext? context}) {
+    isCancelled = true;
+    isDownloading = false;
+    progress = 0.0;  // 重置进度
+    if (showCancelledSnackBar && context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('下载已取消')),
+      );
+    }
+    UpdateService.currentTask.value = null; // 取消后清空任务，隐藏提示栏
+  }
+}
+
 class UpdateService {
+  static final ValueNotifier<DownloadTask?> currentTask = ValueNotifier(null);
+  /// 下载当期航图完整包（后台下载，不影响主界面）
+  Future<void> downloadCurrentAipPackage(BuildContext context, {
+    required String version, // 例如 '2025-07'
+    required String packageVersion, // 例如 'V1.4'
+    String? saveFileName, // 可选，默认用原始zip名
+  }) async {
+    // 检查网络连接
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      _showErrorDialog('没有网络连接', context: context);
+      return;
+    }
+
+    // 检查是否有正在下载的任务
+    if (currentTask.value != null && currentTask.value!.isDownloading) {
+      // 显示统一的对话框，处理取消当前下载或切换到新版本
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('下载确认'),
+          content: Text(
+            currentTask.value!.version == version
+            ? '当前版本正在下载中，是否取消下载？'
+            : '正在下载版本 ${currentTask.value!.version}，是否切换到下载版本 $version？'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false), 
+              child: Text(currentTask.value!.version == version ? '继续下载' : '取消')
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true), 
+              child: Text(currentTask.value!.version == version ? '取消' : '切换')
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) return;
+
+      // 无论是取消当前版本还是切换到新版本，都需要取消当前任务
+      currentTask.value?.cancel(showCancelledSnackBar: false);
+      currentTask.value = null; // 立即清空当前任务，防止后续判断出错
+      
+      // 如果是取消当前版本的下载，直接返回
+      if (currentTask.value != null && currentTask.value!.version == version) return;
+
+      // 等待一小段时间确保旧任务完全取消
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // 新增：切换版本时提示开始下载哪个版本
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('开始下载版本 $version 的航图包')),
+      );
+    }
+
+    // 获取token（即username）
+    String token = '';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      token = prefs.getString('auth_token') ?? prefs.getString('saved_username') ?? '';
+    } catch (e) {
+      _showErrorDialog('无法获取登录信息，请重新登录', context: context);
+      return;
+    }
+    if (token.isEmpty) {
+      _showErrorDialog('未登录或登录信息失效，请重新登录', context: context);
+      return;
+    }
+
+    // 拼接下载链接和文件名
+    final url = 'https://www.eaipchina.cn/eaip/packageFile/BASELINE/$version/EAIP$version.$packageVersion/EAIP$version.$packageVersion\_Web.zip?token=$token';
+    final fileName = saveFileName ?? 'EAIP$version.$packageVersion\_Web.zip';
+    // 创建新的下载任务
+    final task = DownloadTask(
+      version: version,
+      packageVersion: packageVersion,
+      isDownloading: true,
+      onCancelled: () {
+        // 只有主动取消时才弹出“下载已取消”
+        // 这里不做任何事，主动取消时在外部调用 cancel(showCancelledSnackBar: true, context: context)
+      }
+    );
+    currentTask.value = task;
+
+    // 开始下载
+    _startDownload(context, url, fileName, task);
+  }
   static const String _updateUrl = 'https://gitee.com/KNA7022/eaipchinaviewerupdate/raw/master/version.json';
   
   // 添加标记，避免重复检查
@@ -525,8 +645,31 @@ class UpdateService {
     );
   }
   
+  void _showErrorDialog(String message, {BuildContext? context}) {
+    final ctx = context ?? navigatorKey.currentContext;
+    if (ctx == null) {
+      print('无法显示错误对话框：$message');
+      return;
+    }
+    
+    showDialog(
+      context: ctx,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('错误'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              child: const Text('确定'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _closeProgressDialog(BuildContext context) {
-    // 安全地关闭进度对话框
     if (navigatorKey.currentState != null && navigatorKey.currentState!.canPop()) {
       navigatorKey.currentState!.pop();
     }
@@ -565,32 +708,6 @@ class UpdateService {
     );
   }
   
-  void _showErrorDialog(String message) {
-    final context = navigatorKey.currentContext;
-    if (context == null) {
-      print('无法显示错误对话框：$message');
-      return;
-    }
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('更新失败'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              child: const Text('确定'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
   void _showErrorDetailDialog(BuildContext context, String title, String message, String apkUrl) {
     final ctx = navigatorKey.currentContext ?? context;
     if (ctx == null) return;
@@ -619,41 +736,25 @@ class UpdateService {
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                       } else {
-                        if (ctx.mounted) {
-                          _showErrorDialog('无法打开浏览器下载链接');
+                        if (Theme.of(context).platform == TargetPlatform.android) {
+                          // Android设备上，尝试直接打开设置
+                          await openAppSettings();
+                        } else {
+                          // 其他平台，给出提示
+                          _showErrorDialog('请手动下载并安装更新');
                         }
                       }
                     },
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '提示：下载完成后请点击APK文件进行安装',
-                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-                textAlign: TextAlign.center,
-              ),
             ],
           ),
           actions: [
             TextButton(
-              child: const Text('取消'),
+              child: const Text('关闭'),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('去设置'),
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                // 尝试打开应用设置页面
-                try {
-                  await openAppSettings();
-                } catch (e) {
-                  if (ctx.mounted) {
-                    _showErrorDialog('无法打开设置页面');
-                  }
-                }
               },
             ),
           ],
@@ -661,10 +762,134 @@ class UpdateService {
       },
     );
   }
-}
 
-// 自定义 StatefulBuilder 以便获取其 State
-class StatefulBuilderState extends State<StatefulBuilder> {
-  @override
-  Widget build(BuildContext context) => widget.builder(context, setState);
-} 
+  Future<void> _startDownload(BuildContext context, String url, String fileName, DownloadTask task) async {
+    try {
+      Directory directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          await directory.create(recursive: true);
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+      final filePath = '${directory.path}/$fileName';
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final client = http.Client();
+      StreamSubscription? subscription;
+      
+      try {
+        final request = http.Request('GET', Uri.parse(url));
+        final response = await client.send(request);
+        if (response.statusCode == 200) {
+          final contentLength = response.contentLength ?? 0;
+          final sink = file.openWrite();
+          int receivedBytes = 0;
+
+          subscription = response.stream.listen(
+            (bytes) async {
+              if (task.isCancelled) {
+                subscription?.cancel();
+                sink.close();
+                try {
+                  if (await file.exists()) {
+                    await file.delete();
+                  }
+                } catch (e) {
+                  print('删除文件失败: $e');
+                }
+                client.close();
+                return;
+              }
+
+              sink.add(bytes);
+              receivedBytes += bytes.length;
+              if (contentLength > 0) {
+                task.progress = receivedBytes / contentLength;
+                currentTask.value = task;
+              }
+            },
+            onDone: () async {
+              await sink.flush();
+              await sink.close();
+
+              if (!task.isCancelled) {
+                if (await file.exists() && await file.length() > 0) {
+                  task.isDownloading = false;
+                  currentTask.value = task;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('航图包下载完成: $fileName')),
+                  );
+                }
+              }
+            },
+            onError: (error) async {
+              print('下载错误: $error');
+              if (!task.isCancelled) {
+                task.isDownloading = false;
+                currentTask.value = task;
+                _showErrorDialog('下载失败: $error', context: context);
+              }
+              subscription?.cancel();
+              await sink.close();
+              try {
+                if (await file.exists()) {
+                  await file.delete();
+                }
+              } catch (e) {
+                print('删除文件失败: $e');
+              }
+            },
+            cancelOnError: true,
+          );
+
+          // 监听取消状态
+          void checkCancellation() async {
+            if (task.isCancelled) {
+              subscription?.cancel();
+              sink.close();
+              try {
+                if (await file.exists()) {
+                  await file.delete();
+                }
+              } catch (e) {
+                print('删除文件失败: $e');
+              }
+              client.close();
+            }
+          }
+          
+          // 定期检查是否被取消
+          Timer.periodic(const Duration(milliseconds: 500), (timer) {
+            if (task.isCancelled || !task.isDownloading) {
+              checkCancellation();
+              timer.cancel();
+            }
+          });
+        } else {
+          throw Exception('服务器返回错误: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('下载错误: $e');
+        subscription?.cancel();
+        if (!task.isCancelled) {
+          task.isDownloading = false;
+          currentTask.value = task;
+          _showErrorDialog('下载失败: $e', context: context);
+        }
+      }
+    } catch (e) {
+      print('下载错误: $e');
+      if (!task.isCancelled) {
+        task.isDownloading = false;
+        currentTask.value = task;
+        _showErrorDialog('下载失败: $e', context: context);
+      }
+    }
+  }
+}

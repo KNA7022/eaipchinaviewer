@@ -301,6 +301,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text('点击查看详细名单'),
                 onTap: () => _showSponsorsDialog(context),
               ),
+              // 新增捐助作者入口
+              ListTile(
+                leading: const Icon(Icons.volunteer_activism, color: Colors.orange),
+                title: const Text('捐助作者'),
+                subtitle: const Text('支持作者，点此跳转'),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => _launchUrl('http://afdian.tv/a/kna7022'),
+              ),
             ],
           ),
           

@@ -7,6 +7,7 @@ import '../models/version_model.dart';
 import 'package:intl/intl.dart';  
 import '../screens/weather_screen.dart'; 
 import '../services/theme_service.dart';
+import '../services/update_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -531,13 +532,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   final bool isExpired = version.effectiveDate.isBefore(DateTime.now());
                   final bool isUpcoming = version.effectiveDate.isAfter(DateTime.now());
                   
-                  final statusConfig = isCurrent
-                      ? _StatusConfig('当前版本', Colors.green)
-                      : isExpired
-                          ? _StatusConfig('已失效', Colors.grey)
-                          : isUpcoming
-                              ? _StatusConfig('即将生效', Colors.orange)
-                              : _StatusConfig('未知状态', Colors.grey);
+                  // 检查是否正在下载
+                  final isDownloading = UpdateService.currentTask.value?.version == version.name &&
+                      UpdateService.currentTask.value?.isDownloading == true;
+                  
+                  final statusConfig = isDownloading
+                      ? _StatusConfig('下载中', Colors.blue)
+                      : isCurrent
+                          ? _StatusConfig('当前版本', Colors.green)
+                          : isExpired
+                              ? _StatusConfig('已失效', Colors.grey)
+                              : isUpcoming
+                                  ? _StatusConfig('即将生效', Colors.orange)
+                                  : _StatusConfig('未知状态', Colors.grey);
                   
                   return PopupMenuItem(
                     value: version.name,
@@ -629,26 +636,125 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.settings),
                 onPressed: () => Navigator.pushNamed(context, '/settings'),
               ),
+              IconButton(
+                icon: const Icon(Icons.download),
+                tooltip: '下载当期航图包',
+                onPressed: () async {
+                  // 获取当前界面选中的版本对象
+                  final current = _versions.firstWhere(
+                    (v) => v.name == _currentVersion,
+                    orElse: () => _versions.first,
+                  );
+                  if (current == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('未获取到当前版本信息')),
+                    );
+                    return;
+                  }
+                  // 从 filePath 提取 packageVersion（如 V1.4）
+                  final reg = RegExp(r'EAIP\d{4}-\d{2}\.(V[\d.]+)');
+                  final match = reg.firstMatch(current.filePath);
+                  String packageVersion = 'V1.0';
+                  if (match != null && match.groupCount >= 1) {
+                    packageVersion = match.group(1)!;
+                  }
+                  // 调用下载
+                  await UpdateService().downloadCurrentAipPackage(
+                    context,
+                    version: current.name,
+                    packageVersion: packageVersion,
+                  );
+                },
+              ),
             ],
           ),
-          body: Row(
+          body: Stack(
             children: [
-              // 左侧抽屉
-              if (_isDrawerOpen)
-                SizedBox(
-                  width: _drawerWidth,
-                  child: _buildDrawer(),
-                ),
-              // 抽屉开关按钮
-              IconButton(
-                icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
-                onPressed: _toggleDrawer,
+              Row(
+                children: [
+                  // 左侧抽屉
+                  if (_isDrawerOpen)
+                    SizedBox(
+                      width: _drawerWidth,
+                      child: _buildDrawer(),
+                    ),
+                  // 抽屉开关按钮
+                  IconButton(
+                    icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
+                    onPressed: _toggleDrawer,
+                  ),
+                  // 右侧主内容区
+                  Expanded(
+                    child: _selectedPdfUrl != null
+                        ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
+                        : const Center(child: Text('请选择要查看的文档')),
+                  ),
+                ],
               ),
-              // 右侧主内容区
-              Expanded(
-                child: _selectedPdfUrl != null
-                    ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
-                    : const Center(child: Text('请选择要查看的文档')),
+              // 底部下载进度条
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ValueListenableBuilder<DownloadTask?>(
+                  valueListenable: UpdateService.currentTask,
+                  builder: (context, task, child) {
+                    if (task == null || !task.isDownloading) return const SizedBox.shrink();
+                    return Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: double.infinity,
+                        color: Colors.black.withOpacity(0.7),
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: LinearProgressIndicator(
+                                value: task.progress,
+                                minHeight: 4,
+                                backgroundColor: Colors.black12,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '下载${task.version} ${(task.progress * 100).toStringAsFixed(1)}%',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                            const SizedBox(width: 12),
+                            IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                              onPressed: () {
+                                showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('取消下载'),
+                                    content: const Text('确定要取消当前版本的下载吗？'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('继续下载'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('取消'),
+                                      ),
+                                    ],
+                                  ),
+                                ).then((shouldCancel) {
+                                  if (shouldCancel == true) {
+                                    task.cancel();
+                                  }
+                                });
+                              },
+                              tooltip: '取消下载',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
