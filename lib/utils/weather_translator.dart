@@ -1,6 +1,7 @@
 import '../models/weather_model.dart';
 
 class WeatherTranslator {
+  // METAR翻译主方法
   static String translateMetar(WeatherData data) {
     List<String> parts = [];
     
@@ -8,510 +9,313 @@ class WeatherTranslator {
     parts.add('${data.icaoId}机场天气报告');
     parts.add('观测时间：${_formatDateTime(data.reportTime)}');
     
-    // 温度露点
-    if (data.temperature != null) {
-      parts.add('温度：${data.temperature}°C');
-    }
-    if (data.dewpoint != null) {
-      parts.add('露点：${data.dewpoint}°C');
-    }
-    
-    // 风向风速
-    if (data.windDirection != null && data.windSpeed != null) {
-      String windDirectionText = _getWindDirectionText(data.windDirection!);
-      parts.add('风向：${data.windDirection}度 ($windDirectionText)');
-      parts.add('风速：${data.windSpeed}节 (${_convertKnotsToKmh(data.windSpeed!)}公里/小时)');
-    } else if (data.windDirection == 0 && data.windSpeed == 0) {
-      parts.add('风向风速：静风');
-    } else if (data.windDirection == null && data.windSpeed != null) {
-      parts.add('风速：${data.windSpeed}节 (${_convertKnotsToKmh(data.windSpeed!)}公里/小时)');
-    }
-    
-    // 能见度
-    parts.add('能见度：${_translateVisibility(data.visibility)}');
-    
-    // 云层
-    if (data.clouds.isNotEmpty) {
-      parts.add('云层：${_translateClouds(data.clouds)}');
-    }
-    
-    // 解析METAR中的特殊天气现象
-    String rawMetar = data.rawMetar;
-    List<String> weatherPhenomena = _extractWeatherPhenomena(rawMetar);
-    if (weatherPhenomena.isNotEmpty) {
-      parts.add('天气现象：${weatherPhenomena.join('、')}');
-    }
-    
-    // QNH (气压)
-    String? qnh = _extractQNH(rawMetar);
-    if (qnh != null) {
-      parts.add('QNH：$qnh hPa');
+    // 解析原始METAR报文
+    String rawMetar = data.rawMetar.trim();
+    if (rawMetar.isNotEmpty) {
+      MetarParser parser = MetarParser(rawMetar);
+      
+      // 风向风速
+      String? windInfo = parser.getWindInfo();
+      if (windInfo != null) {
+        parts.add(windInfo);
+      }
+      
+      // 能见度
+      String? visibilityInfo = parser.getVisibilityInfo();
+      if (visibilityInfo != null) {
+        parts.add(visibilityInfo);
+      }
+      
+      // 天气现象
+      List<String> weatherPhenomena = parser.getWeatherPhenomena();
+      if (weatherPhenomena.isNotEmpty) {
+        parts.add('天气现象：${weatherPhenomena.join('、')}');
+      }
+      
+      // 云层信息
+      List<String> cloudInfo = parser.getCloudInfo();
+      if (cloudInfo.isNotEmpty) {
+        parts.add('云层：${cloudInfo.join('、')}');
+      }
+      
+      // 温度露点（优先使用解析的数据）
+      String? tempDewInfo = parser.getTemperatureDewpointInfo();
+      if (tempDewInfo != null) {
+        parts.add(tempDewInfo);
+      } else {
+        // 备用：使用结构化数据
+        if (data.temperature != null) {
+          parts.add('温度：${data.temperature}°C');
+        }
+        if (data.dewpoint != null) {
+          parts.add('露点：${data.dewpoint}°C');
+        }
+      }
+      
+      // 气压
+      String? pressureInfo = parser.getPressureInfo();
+      if (pressureInfo != null) {
+        parts.add(pressureInfo);
+      }
+      
+      // 跑道视程
+      List<String> rvrInfo = parser.getRunwayVisualRangeInfo();
+      if (rvrInfo.isNotEmpty) {
+        parts.add('跑道视程：${rvrInfo.join('、')}');
+      }
     }
     
     return parts.join('\n');
   }
 
+  // TAF翻译主方法
   static String translateTaf(String rawTaf) {
     if (rawTaf.isEmpty) return '无预报信息';
     
-    List<String> lines = rawTaf.split('\n');
-    List<String> result = [];
-    
-    for (String line in lines) {
-      result.add(_translateTafLine(line));
-    }
-    
-    return result.join('\n\n');
-  }
-  
-  static String _translateTafLine(String line) {
-    if (line.trim().isEmpty) return '';
-    
-    List<String> parts = line.split(' ');
-    if (parts.isEmpty) return '预报解析失败';
-
-    // 如果第一个词是TAF，则移除它
-    if (parts[0] == 'TAF') {
-      parts = parts.sublist(1);
-    }
-    if (parts.isEmpty) return '预报解析失败';
-
-    List<String> translated = ['天气预报：'];
-    
-    // 机场和发布时间
-    String icao = parts[0];
-    translated.add('$icao机场');
-    
-    if (parts.length > 1) {
-      String issueTime = _translateDateTime(parts[1]);
-      translated.add('发布时间：$issueTime');
-    }
-
-    // 预报有效时段
-    if (parts.length > 2 && _isValidPeriod(parts[2])) {
-      String validPeriod = _translateValidPeriod(parts[2]);
-      translated.add('预报时段：$validPeriod');
-      parts = parts.sublist(3);
-    } else {
-      parts = parts.sublist(2);
-    }
-
-    // 找出基本预报部分和变化部分的分界点
-    int changeIndex = _findFirstChangeIndex(parts);
-    
-    // 处理基本预报
-    if (changeIndex > 0) {
-      List<String> baseForecast = parts.sublist(0, changeIndex);
-      translated.add('\n预报：${_translateWeatherGroup(baseForecast)}');
-      
-      // 提取并翻译温度信息
-      List<String> tempInfo = _extractTemperatureInfo(parts);
-      if (tempInfo.isNotEmpty) {
-        translated.add('\n${tempInfo.join("，")}');
-      }
-      
-      parts = parts.sublist(changeIndex);
-    } else if (changeIndex == -1) {
-      // 没有变化部分，整个都是基本预报
-      List<String> baseForecast = parts;
-      translated.add('\n预报：${_translateWeatherGroup(baseForecast)}');
-      
-      // 提取并翻译温度信息
-      List<String> tempInfo = _extractTemperatureInfo(parts);
-      if (tempInfo.isNotEmpty) {
-        translated.add('\n${tempInfo.join("，")}');
-      }
-      
-      return translated.join('\n');
-    }
-
-    // 处理变化部分
-    while (parts.isNotEmpty) {
-      int nextChangeIndex = _findNextChangeIndex(parts);
-      List<String> changeGroup;
-      
-      if (nextChangeIndex > 0) {
-        changeGroup = parts.sublist(0, nextChangeIndex);
-        parts = parts.sublist(nextChangeIndex);
-      } else {
-        changeGroup = parts;
-        parts = [];
-      }
-      
-      translated.add(_translateChangeGroup(changeGroup));
-    }
-
-    return translated.join('\n');
-  }
-
-  // 寻找第一个变化标记的位置
-  static int _findFirstChangeIndex(List<String> parts) {
-    for (int i = 0; i < parts.length; i++) {
-      if (_isChangeIndicator(parts[i])) {
-        return i;
-      }
-    }
-    return -1;
-  }
-  
-  // 寻找下一个变化标记的位置
-  static int _findNextChangeIndex(List<String> parts) {
-    if (parts.isEmpty) return -1;
-    
-    // 跳过第一个变化标记
-    for (int i = 1; i < parts.length; i++) {
-      if (_isChangeIndicator(parts[i])) {
-        return i;
-      }
-    }
-    return -1;
-  }
-  
-  // 判断是否是变化标记
-  static bool _isChangeIndicator(String part) {
-    return part.startsWith('BECMG') || 
-           part.startsWith('TEMPO') || 
-           part.startsWith('FM') || 
-           part.startsWith('PROB');
-  }
-  
-  // 翻译基本天气组
-  static String _translateWeatherGroup(List<String> group) {
-    List<String> result = [];
-    
-    // 处理风向风速
-    String? wind = _findAndTranslateWind(group, 0);
-    if (wind != null) {
-      result.add(wind);
-    }
-    
-    // 处理能见度
-    String? visibility = _findAndTranslateVisibility(group, 0);
-    if (visibility != null) {
-      result.add(visibility);
-    }
-    
-    // 处理天气现象
-    List<String> wxPhenomena = _findAndTranslateWeatherPhenomena(group, 0);
-    if (wxPhenomena.isNotEmpty) {
-      result.add('天气现象：${wxPhenomena.join('、')}');
-    }
-    
-    // 处理云层
-    List<String> clouds = _findAndTranslateClouds(group, 0);
-    if (clouds.isNotEmpty) {
-      result.add('云层：${clouds.join('、')}');
-    }
-    
-    return result.join(' ');
-  }
-  
-  // 翻译变化组
-  static String _translateChangeGroup(List<String> group) {
-    if (group.isEmpty) return '';
-    
-    String changeType = group[0];
-    List<String> result = [];
-    
-    if (changeType.startsWith('BECMG')) {
-      // 处理BECMG (Becoming) 格式
-      String period = _translatePeriod(changeType.substring(5));
-      result.add('\n逐渐变化${period.isNotEmpty ? period : ''}：');
-      result.add(_translateWeatherGroup(group.sublist(1)));
-    } else if (changeType.startsWith('TEMPO')) {
-      // 处理TEMPO (Temporarily) 格式
-      String period = _translatePeriod(changeType.substring(5));
-      result.add('\n短时${period.isNotEmpty ? period : ''}：');
-      result.add(_translateWeatherGroup(group.sublist(1)));
-    } else if (changeType.startsWith('FM')) {
-      // 处理FM (From) 格式
-      String time = _translateFromTime(changeType);
-      result.add('\n从$time起：');
-      result.add(_translateWeatherGroup(group.sublist(1)));
-    } else if (changeType.startsWith('PROB')) {
-      // 处理PROB (Probability) 格式
-      String prob = changeType.substring(4, 6);
-      
-      if (group.length > 1 && group[1].startsWith('TEMPO')) {
-        result.add('\n概率$prob%短时：');
-        result.add(_translateWeatherGroup(group.sublist(2)));
-      } else {
-        result.add('\n概率$prob%：');
-        result.add(_translateWeatherGroup(group.sublist(1)));
-      }
-    }
-    
-    return result.join(' ');
-  }
-  
-  // 翻译时间段
-  static String _translatePeriod(String period) {
-    if (period.length != 9) return '';
-    try {
-      int fromDay = int.parse(period.substring(0, 2));
-      int fromHour = int.parse(period.substring(2, 4));
-      int toDay = int.parse(period.substring(5, 7));
-      int toHour = int.parse(period.substring(7, 9));
-      return '($fromDay日$fromHour时至$toDay日$toHour时)';
-    } catch (e) {
-      return '';
-    }
-  }
-  
-  // 提取并翻译温度信息
-  static List<String> _extractTemperatureInfo(List<String> parts) {
-    List<String> result = [];
-    
-    for (String part in parts) {
-      if (part.startsWith('TX')) {
-        try {
-          // 例如 TX26/2508Z
-          String temp = part.substring(2, part.indexOf('/'));
-          String timeCode = part.substring(part.indexOf('/') + 1, part.length - 1);
-          int day = int.parse(timeCode.substring(0, 2));
-          int hour = int.parse(timeCode.substring(2, 4));
-          result.add('最高温度：${temp}°C ($day日$hour时)');
-        } catch (e) {
-          result.add('最高温度：$part');
-        }
-      } else if (part.startsWith('TN')) {
-        try {
-          // 例如 TN11/2423Z
-          String temp = part.substring(2, part.indexOf('/'));
-          String timeCode = part.substring(part.indexOf('/') + 1, part.length - 1);
-          int day = int.parse(timeCode.substring(0, 2));
-          int hour = int.parse(timeCode.substring(2, 4));
-          result.add('最低温度：${temp}°C ($day日$hour时)');
-        } catch (e) {
-          result.add('最低温度：$part');
-        }
-      }
-    }
-    
-    return result;
+    TafParser parser = TafParser(rawTaf);
+    return parser.parse();
   }
 
   static String _formatDateTime(DateTime dt) {
     return '${dt.year}年${dt.month}月${dt.day}日 ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
+}
 
-  static String _translateFromTime(String code) {
-    if (!code.startsWith('FM') || code.length < 6) return code;
-    try {
-      int day = int.parse(code.substring(2, 4));
-      int hour = int.parse(code.substring(4, 6));
-      int minute = code.length >= 8 ? int.parse(code.substring(6, 8)) : 0;
-      return '$day日$hour时${minute > 0 ? '$minute分' : ''}';
-    } catch (e) {
-      return code;
-    }
-  }
-
-  static String? _findAndTranslateWind(List<String> parts, int startIndex) {
-    for (int i = startIndex; i < parts.length; i++) {
-      if (_isWind(parts[i])) {
-        return _translateWind(parts[i]);
+// METAR解析器
+class MetarParser {
+  final String rawMetar;
+  final List<String> parts;
+  
+  MetarParser(this.rawMetar) : parts = rawMetar.split(RegExp(r'\s+'));
+  
+  // 获取风向风速信息
+  String? getWindInfo() {
+    for (String part in parts) {
+      // 匹配风向风速格式：09008KT, 00000KT, 24015G25KT, VRB03KT, 04004MPS
+      RegExp windPattern = RegExp(r'^(VRB|\d{3})(\d{2})(G(\d{2}))?(KT|MPS)$');
+      Match? match = windPattern.firstMatch(part);
+      
+      if (match != null) {
+        String direction = match.group(1)!;
+        int speed = int.parse(match.group(2)!);
+        String? gustGroup = match.group(4);
+        String unit = match.group(5)!;
+        
+        List<String> windInfo = [];
+        
+        // 风向
+        if (direction == 'VRB') {
+          windInfo.add('风向：不定');
+        } else if (direction == '000') {
+          windInfo.add('风向：静风');
+        } else {
+          int dir = int.parse(direction);
+          String dirText = _getWindDirectionText(dir);
+          windInfo.add('风向：${dir}度 ($dirText)');
+        }
+        
+        // 风速
+        if (speed == 0) {
+          windInfo.add('风速：静风');
+        } else {
+          String speedUnit = unit == 'MPS' ? '米/秒' : '节';
+          int kmhSpeed = unit == 'MPS' ? _convertMpsToKmh(speed) : _convertKnotsToKmh(speed);
+          windInfo.add('风速：$speed$speedUnit (${kmhSpeed}公里/小时)');
+          
+          // 阵风
+          if (gustGroup != null) {
+            int gust = int.parse(gustGroup);
+            int kmhGust = unit == 'MPS' ? _convertMpsToKmh(gust) : _convertKnotsToKmh(gust);
+            windInfo.add('阵风：$gust$speedUnit (${kmhGust}公里/小时)');
+          }
+        }
+        
+        return windInfo.join('，');
       }
     }
     return null;
   }
-
-  static bool _isWind(String code) {
-    // 匹配风向风速格式，例如 09008KT, 00000KT, 24015G25KT, VRB03KT
-    // 以及MPS格式：04004MPS, 23010G16MPS
-    return RegExp(r'^(VRB|\d{3})\d{2}(G\d{2})?(KT|MPS)$').hasMatch(code);
-  }
-
-  static String _translateWind(String code) {
-    try {
-      String dirPart = code.substring(0, 3);
-      int speed = int.parse(code.substring(3, 5));
-      bool isMPS = code.contains('MPS');
-      
-      String dirText;
-      if (dirPart == 'VRB') {
-        dirText = '风向不定';
-      } else {
-        int dir = int.parse(dirPart);
-        dirText = '风向${dir}度 (${_getWindDirectionText(dir)})';
+  
+  // 获取能见度信息
+  String? getVisibilityInfo() {
+    for (String part in parts) {
+      // CAVOK
+      if (part == 'CAVOK') {
+        return '能见度：CAVOK (天空晴朗，能见度10公里以上，无重要云层)';
       }
       
-      String speedUnit = isMPS ? '米/秒' : '节';
-      int kmhSpeed = isMPS ? _convertMpsToKmh(speed) : _convertKnotsToKmh(speed);
-      String speedText = '风速$speed$speedUnit ($kmhSpeed公里/小时)';
-      
-      if (code.contains('G')) {
-        int gust = int.parse(code.substring(code.indexOf('G') + 1, code.indexOf(isMPS ? 'M' : 'K')));
-        int kmhGust = isMPS ? _convertMpsToKmh(gust) : _convertKnotsToKmh(gust);
-        return '$dirText，$speedText，阵风$gust$speedUnit ($kmhGust公里/小时)';
+      // 数字能见度：9999, 1200, 0800等
+      if (RegExp(r'^\d{4}$').hasMatch(part)) {
+        int vis = int.parse(part);
+        if (vis == 9999) {
+          return '能见度：10公里以上';
+        } else {
+          double visKm = vis / 1000.0;
+          String warning = vis <= 5000 ? ' (能见度较低)' : '';
+          return '能见度：${visKm.toStringAsFixed(1)}公里$warning';
+        }
       }
       
-      return '$dirText，$speedText';
-    } catch (e) {
-      return '风：$code';
+      // 分数能见度：1/2SM, 3/4SM等
+      if (RegExp(r'^\d+/\d+SM$').hasMatch(part)) {
+        return '能见度：$part';
+      }
+      
+      // 小数能见度：1.5SM, 2.5SM等
+      if (RegExp(r'^\d+\.\d+SM$').hasMatch(part)) {
+        return '能见度：$part';
+      }
     }
+    return null;
   }
-
-  // 将米/秒转换为公里/小时
-  static int _convertMpsToKmh(int mps) {
-    return (mps * 3.6).round();
-  }
-
-  static String _translateVisibility(String vis) {
-    if (vis == '10+' || vis == '9999') return '大于10千米';
-    if (vis == 'CAVOK') return '能见度良好，无云层';
-    if (vis == 'NA') return '不可用';
+  
+  // 获取天气现象
+  List<String> getWeatherPhenomena() {
+    List<String> phenomena = [];
     
-    try {
-      double visValue = double.parse(vis);
-      // 小于等于5000米时需要特别注意
-      if (visValue <= 5) {
-        return '$vis千米 (能见度较低)';
-      }
-      return '$vis千米';
-    } catch (e) {
-      return '$vis';
-    }
-  }
-
-  static String _translateClouds(List<Cloud> clouds) {
-    return clouds.map((cloud) {
-      String cover = _translateCloudCover(cloud.cover);
-      int heightMeters = (cloud.base * 30.48).round(); // 英尺转米
-      return '$cover ${cloud.base}英尺 ($heightMeters米)';
-    }).join('，');
-  }
-
-  static String _translateCloudCover(String cover) {
-    switch (cover.toUpperCase()) {
-      case 'SKC': return '晴空';
-      case 'CLR': return '晴空';
-      case 'NCD': return '无云';
-      case 'NSC': return '无重要云层';
-      case 'FEW': return '少量 (1-2成)';
-      case 'SCT': return '疏云 (3-4成)';
-      case 'BKN': return '多云 (5-7成)';
-      case 'OVC': return '阴天 (8成以上)';
-      case 'VV': return '垂直能见度';
-      case 'TCU': return '塔状积云';
-      case 'CB': return '积雨云';
-      default: return cover;
-    }
-  }
-
-  static String _translateDateTime(String code) {
-    try {
-      int day = int.parse(code.substring(0, 2));
-      int hour = int.parse(code.substring(2, 4));
-      int minute = int.parse(code.substring(4, 6));
-      return '$day日$hour时${minute}分';
-    } catch (e) {
-      return code;
-    }
-  }
-
-  static bool _isValidPeriod(String code) {
-    return code.length == 9 && code.contains('/');
-  }
-
-  static String _translateValidPeriod(String code) {
-    if (code.length != 9 || !code.contains('/')) return code;
-    try {
-      int fromDay = int.parse(code.substring(0, 2));
-      int fromHour = int.parse(code.substring(2, 4));
-      int toDay = int.parse(code.substring(5, 7));
-      int toHour = int.parse(code.substring(7, 9));
-      return '$fromDay日$fromHour时 至 $toDay日$toHour时';
-    } catch (e) {
-      return code;
-    }
-  }
-
-  static List<String> _findAndTranslateWeatherPhenomena(List<String> parts, int startIndex) {
-    List<String> result = [];
-    for (int i = startIndex; i < parts.length; i++) {
-      if (_isWeather(parts[i])) {
-        result.add(_translateWeatherPhenomena(parts[i]));
+    for (String part in parts) {
+      if (_isWeatherPhenomena(part)) {
+        String translated = _translateWeatherPhenomena(part);
+        if (translated.isNotEmpty) {
+          phenomena.add(translated);
+        }
       }
     }
-    return result;
-  }
-
-  static List<String> _findAndTranslateClouds(List<String> parts, int startIndex) {
-    List<String> result = [];
-    for (int i = startIndex; i < parts.length; i++) {
-      if (_isCloud(parts[i])) {
-        String cover = _translateCloudCover(parts[i].substring(0, 3));
-        int height = int.tryParse(parts[i].substring(3)) ?? 0;
-        int heightMeters = (height * 30.48).round(); // 英尺转米
-        result.add('$cover ${height * 100}英尺 ($heightMeters米)');
-      }
-    }
-    return result;
-  }
-
-  static bool _isVisibility(String code) {
-    // 匹配能见度格式，例如 9999, 1000, CAVOK
-    return RegExp(r'^\d{4}$').hasMatch(code) || code == 'CAVOK' || code == '9999';
+    
+    return phenomena;
   }
   
-  static bool _isWeather(String code) {
-    // 匹配天气现象格式
-    return RegExp(r'^[+-]?(VC)?(MI|PR|BC|DR|BL|SH|TS|FZ)?'
-        r'(DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PO|SQ|FC|SS|DS)').hasMatch(code);
+  // 获取云层信息
+  List<String> getCloudInfo() {
+    List<String> clouds = [];
+    
+    for (String part in parts) {
+      if (_isCloudLayer(part)) {
+        String translated = _translateCloudLayer(part);
+        if (translated.isNotEmpty) {
+          clouds.add(translated);
+        }
+      }
+    }
+    
+    return clouds;
   }
   
-  static bool _isCloud(String code) {
-    // 匹配云层格式，例如 FEW020, BKN030, OVC100, SKC, NSC
-    return code.startsWith('FEW') || code.startsWith('SCT') || 
-           code.startsWith('BKN') || code.startsWith('OVC') ||
-           code == 'SKC' || code == 'NSC' || code == 'CLR' || code == 'NCD';
+  // 获取温度露点信息
+  String? getTemperatureDewpointInfo() {
+    for (String part in parts) {
+      // 匹配温度露点格式：M04/M10, 15/08, 22/M05等
+      RegExp tempPattern = RegExp(r'^(M?\d{2})/(M?\d{2})$');
+      Match? match = tempPattern.firstMatch(part);
+      
+      if (match != null) {
+        String tempStr = match.group(1)!;
+        String dewStr = match.group(2)!;
+        
+        int temp = _parseTemperature(tempStr);
+        int dew = _parseTemperature(dewStr);
+        
+        return '温度：${temp}°C，露点：${dew}°C';
+      }
+    }
+    return null;
   }
-
-  static String _translateWeatherPhenomena(String code) {
+  
+  // 获取气压信息
+  String? getPressureInfo() {
+    for (String part in parts) {
+      // QNH格式：Q1013, A2992等
+      if (RegExp(r'^Q\d{4}$').hasMatch(part)) {
+        String pressure = part.substring(1);
+        return 'QNH：${pressure} hPa';
+      }
+      
+      if (RegExp(r'^A\d{4}$').hasMatch(part)) {
+        String pressure = part.substring(1);
+        double inHg = int.parse(pressure) / 100.0;
+        int hPa = (inHg * 33.8639).round();
+        return 'QNH：${inHg.toStringAsFixed(2)} inHg (${hPa} hPa)';
+      }
+    }
+    return null;
+  }
+  
+  // 获取跑道视程信息
+  List<String> getRunwayVisualRangeInfo() {
+    List<String> rvrInfo = [];
+    
+    for (String part in parts) {
+      // RVR格式：R06/1200V1800FT, R24/0600FT等
+      if (part.startsWith('R') && part.contains('/')) {
+        RegExp rvrPattern = RegExp(r'^R(\d{2}[LCR]?)/(\d{4})(V(\d{4}))?(FT|M)?$');
+        Match? match = rvrPattern.firstMatch(part);
+        
+        if (match != null) {
+          String runway = match.group(1)!;
+          String vis1 = match.group(2)!;
+          String? vis2 = match.group(4);
+          String unit = match.group(5) ?? 'M';
+          
+          String unitText = unit == 'FT' ? '英尺' : '米';
+          
+          if (vis2 != null) {
+            rvrInfo.add('跑道${runway}：${vis1}-${vis2}${unitText}');
+          } else {
+            rvrInfo.add('跑道${runway}：${vis1}${unitText}');
+          }
+        }
+      }
+    }
+    
+    return rvrInfo;
+  }
+  
+  // 判断是否为天气现象
+  bool _isWeatherPhenomena(String code) {
+    // 天气现象的正则表达式
+    RegExp pattern = RegExp(r'^[+-]?(VC)?(MI|PR|BC|DR|BL|SH|TS|FZ)?(DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PO|SQ|FC|SS|DS)+$');
+    return pattern.hasMatch(code);
+  }
+  
+  // 判断是否为云层
+  bool _isCloudLayer(String code) {
+    return RegExp(r'^(SKC|CLR|NSC|NCD|FEW|SCT|BKN|OVC|VV)(\d{3})?(TCU|CB)?$').hasMatch(code) ||
+           ['SKC', 'CLR', 'NSC', 'NCD'].contains(code);
+  }
+  
+  // 翻译天气现象
+  String _translateWeatherPhenomena(String code) {
+    String result = '';
+    String remaining = code;
+    
     // 强度前缀
-    String intensity = '';
-    if (code.startsWith('+')) {
-      intensity = '强';
-      code = code.substring(1);
-    } else if (code.startsWith('-')) {
-      intensity = '弱';
-      code = code.substring(1);
+    if (remaining.startsWith('+')) {
+      result += '强';
+      remaining = remaining.substring(1);
+    } else if (remaining.startsWith('-')) {
+      result += '弱';
+      remaining = remaining.substring(1);
     }
     
-    // 附近天气
+    // 附近标识
     bool isVicinity = false;
-    if (code.startsWith('VC')) {
+    if (remaining.startsWith('VC')) {
       isVicinity = true;
-      code = code.substring(2);
+      remaining = remaining.substring(2);
     }
     
     // 描述符
-    String descriptor = '';
-    if (code.startsWith('MI')) { // 浅
-      descriptor = '浅';
-      code = code.substring(2);
-    } else if (code.startsWith('PR')) { // 部分
-      descriptor = '部分';
-      code = code.substring(2);
-    } else if (code.startsWith('BC')) { // 散片
-      descriptor = '散片';
-      code = code.substring(2);
-    } else if (code.startsWith('DR')) { // 低吹
-      descriptor = '低吹';
-      code = code.substring(2);
-    } else if (code.startsWith('BL')) { // 高吹
-      descriptor = '高吹';
-      code = code.substring(2);
-    } else if (code.startsWith('SH')) { // 阵
-      descriptor = '阵';
-      code = code.substring(2);
-    } else if (code.startsWith('TS')) { // 雷暴
-      descriptor = '雷暴';
-      code = code.substring(2);
-    } else if (code.startsWith('FZ')) { // 冻
-      descriptor = '冻';
-      code = code.substring(2);
+    Map<String, String> descriptors = {
+      'MI': '浅', 'PR': '部分', 'BC': '散片', 'DR': '低吹',
+      'BL': '高吹', 'SH': '阵', 'TS': '雷暴', 'FZ': '冻'
+    };
+    
+    for (var entry in descriptors.entries) {
+      if (remaining.startsWith(entry.key)) {
+        result += entry.value;
+        remaining = remaining.substring(entry.key.length);
+        break;
+      }
     }
     
     // 天气现象
@@ -524,100 +328,325 @@ class WeatherTranslator {
       'DS': '尘暴'
     };
     
-    String weather = '';
+    // 可能有多个天气现象组合
     for (var entry in phenomena.entries) {
-      if (code.contains(entry.key)) {
-        weather = entry.value;
-        break;
+      if (remaining.contains(entry.key)) {
+        result += entry.value;
+        remaining = remaining.replaceFirst(entry.key, '');
       }
     }
     
-    if (weather.isEmpty) return code; // 无法识别的天气现象
-    
-    String result = intensity + descriptor + weather;
     if (isVicinity) {
       result += '(附近)';
     }
     
-    return result;
+    return result.isEmpty ? code : result;
   }
   
-  // 从METAR中提取天气现象
-  static List<String> _extractWeatherPhenomena(String rawMetar) {
-    List<String> parts = rawMetar.split(' ');
-    List<String> phenomena = [];
+  // 翻译云层
+  String _translateCloudLayer(String code) {
+    // 特殊云层代码
+    Map<String, String> specialClouds = {
+      'SKC': '晴空', 'CLR': '晴空', 'NSC': '无重要云层', 'NCD': '无云'
+    };
     
-    for (String part in parts) {
-      if (_isWeather(part)) {
-        phenomena.add(_translateWeatherPhenomena(part));
-      }
+    if (specialClouds.containsKey(code)) {
+      return specialClouds[code]!;
     }
     
-    return phenomena;
-  }
-  
-  // 从METAR中提取气压值
-  static String? _extractQNH(String rawMetar) {
-    List<String> parts = rawMetar.split(' ');
+    // 解析云层覆盖度和高度
+    RegExp pattern = RegExp(r'^(FEW|SCT|BKN|OVC|VV)(\d{3})(TCU|CB)?$');
+    Match? match = pattern.firstMatch(code);
     
-    for (String part in parts) {
-      if (part.startsWith('Q') && part.length == 5) {
-        try {
-          return part.substring(1);
-        } catch (e) {
-          return null;
-        }
+    if (match != null) {
+      String cover = match.group(1)!;
+      String height = match.group(2)!;
+      String? type = match.group(3);
+      
+      Map<String, String> coverTypes = {
+        'FEW': '少量(1-2成)', 'SCT': '疏云(3-4成)',
+        'BKN': '多云(5-7成)', 'OVC': '阴天(8成以上)',
+        'VV': '垂直能见度'
+      };
+      
+      String coverText = coverTypes[cover] ?? cover;
+      int heightFt = int.parse(height) * 100;
+      int heightM = (heightFt * 0.3048).round();
+      
+      String result = '$coverText ${heightFt}英尺(${heightM}米)';
+      
+      if (type == 'TCU') {
+        result += ' 塔状积云';
+      } else if (type == 'CB') {
+        result += ' 积雨云';
       }
+      
+      return result;
     }
     
-    return null;
+    return code;
   }
   
-  // 根据风向角度获取风向文字描述
-  static String _getWindDirectionText(int direction) {
+  // 解析温度（处理负温度M前缀）
+  int _parseTemperature(String tempStr) {
+    if (tempStr.startsWith('M')) {
+      return -int.parse(tempStr.substring(1));
+    } else {
+      return int.parse(tempStr);
+    }
+  }
+  
+  // 获取风向文字描述
+  String _getWindDirectionText(int direction) {
     if (direction < 0 || direction > 360) return '无效风向';
     
     final directions = [
       '北', '北东北', '东北', '东东北', 
       '东', '东东南', '东南', '南东南',
       '南', '南西南', '西南', '西西南', 
-      '西', '西西北', '西北', '北西北', '北'
+      '西', '西西北', '西北', '北西北'
     ];
     
-    // 将360度分成16个部分，每个部分22.5度
     int index = ((direction + 11.25) % 360) ~/ 22.5;
-    return directions[index];
+    return directions[index % 16];
   }
   
-  // 将节转换为公里/小时
-  static int _convertKnotsToKmh(int knots) {
+  // 节转公里/小时
+  int _convertKnotsToKmh(int knots) {
     return (knots * 1.852).round();
   }
+  
+  // 米/秒转公里/小时
+  int _convertMpsToKmh(int mps) {
+    return (mps * 3.6).round();
+  }
+}
 
-  static String? _findAndTranslateVisibility(List<String> parts, int startIndex) {
-    for (int i = startIndex; i < parts.length; i++) {
-      if (_isVisibility(parts[i])) {
-        return '能见度：${_translateTafVisibility(parts[i])}';
+// TAF解析器
+class TafParser {
+  final String rawTaf;
+  final List<String> lines;
+  
+  TafParser(this.rawTaf) : lines = rawTaf.split('\n').where((line) => line.trim().isNotEmpty).toList();
+  
+  String parse() {
+    if (lines.isEmpty) return '无预报信息';
+    
+    List<String> result = [];
+    
+    for (String line in lines) {
+      String translated = _parseTafLine(line.trim());
+      if (translated.isNotEmpty) {
+        result.add(translated);
       }
     }
-    return null;
+    
+    return result.join('\n\n');
   }
-
-  static String _translateTafVisibility(String code) {
-    if (code == 'CAVOK') return '能见度良好，无云层';
-    if (code == '9999') return '大于10公里';
+  
+  String _parseTafLine(String line) {
+    if (line.isEmpty) return '';
+    
+    List<String> parts = line.split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '预报解析失败';
+    
+    // 移除TAF标识
+    if (parts[0] == 'TAF') {
+      parts = parts.sublist(1);
+    }
+    
+    if (parts.isEmpty) return '预报解析失败';
+    
+    List<String> translated = [];
+    
+    // 机场代码
+    if (parts.isNotEmpty && RegExp(r'^[A-Z]{4}$').hasMatch(parts[0])) {
+      translated.add('${parts[0]}机场天气预报');
+      parts = parts.sublist(1);
+    }
+    
+    // 发布时间
+    if (parts.isNotEmpty && RegExp(r'^\d{6}Z$').hasMatch(parts[0])) {
+      String timeStr = _parseDateTime(parts[0]);
+      translated.add('发布时间：$timeStr');
+      parts = parts.sublist(1);
+    }
+    
+    // 有效时段
+    if (parts.isNotEmpty && RegExp(r'^\d{4}/\d{4}$').hasMatch(parts[0])) {
+      String periodStr = _parseValidPeriod(parts[0]);
+      translated.add('有效时段：$periodStr');
+      parts = parts.sublist(1);
+    }
+    
+    // 解析预报内容
+    if (parts.isNotEmpty) {
+      TafContentParser contentParser = TafContentParser(parts);
+      String content = contentParser.parse();
+      if (content.isNotEmpty) {
+        translated.add(content);
+      }
+    }
+    
+    return translated.join('\n');
+  }
+  
+  String _parseDateTime(String timeStr) {
+    if (timeStr.length != 7 || !timeStr.endsWith('Z')) return timeStr;
     
     try {
-      int vis = int.parse(code);
-      double visKm = vis / 1000.0;
-      
-      if (visKm <= 5) {
-        return '${visKm}公里 (能见度较低)';
-      }
-      
-      return '${visKm}公里';
+      int day = int.parse(timeStr.substring(0, 2));
+      int hour = int.parse(timeStr.substring(2, 4));
+      int minute = int.parse(timeStr.substring(4, 6));
+      return '$day日$hour时${minute}分UTC';
     } catch (e) {
-      return code;
+      return timeStr;
     }
+  }
+  
+  String _parseValidPeriod(String periodStr) {
+    if (periodStr.length != 9 || !periodStr.contains('/')) return periodStr;
+    
+    try {
+      List<String> parts = periodStr.split('/');
+      int fromDay = int.parse(parts[0].substring(0, 2));
+      int fromHour = int.parse(parts[0].substring(2, 4));
+      int toDay = int.parse(parts[1].substring(0, 2));
+      int toHour = int.parse(parts[1].substring(2, 4));
+      
+      return '$fromDay日${fromHour}时 至 $toDay日${toHour}时';
+    } catch (e) {
+      return periodStr;
+    }
+  }
+}
+
+// TAF内容解析器
+class TafContentParser {
+  final List<String> parts;
+  int currentIndex = 0;
+  
+  TafContentParser(this.parts);
+  
+  String parse() {
+    List<String> result = [];
+    
+    while (currentIndex < parts.length) {
+      String part = parts[currentIndex];
+      
+      if (_isChangeIndicator(part)) {
+        String changeInfo = _parseChangeGroup();
+        if (changeInfo.isNotEmpty) {
+          result.add(changeInfo);
+        }
+      } else {
+        // 基本预报
+        String basicForecast = _parseBasicForecast();
+        if (basicForecast.isNotEmpty) {
+          result.add('基本预报：$basicForecast');
+        }
+      }
+    }
+    
+    return result.join('\n');
+  }
+  
+  String _parseBasicForecast() {
+    List<String> forecastParts = [];
+    
+    while (currentIndex < parts.length && !_isChangeIndicator(parts[currentIndex])) {
+      forecastParts.add(parts[currentIndex]);
+      currentIndex++;
+    }
+    
+    return _translateWeatherGroup(forecastParts);
+  }
+  
+  String _parseChangeGroup() {
+    if (currentIndex >= parts.length) return '';
+    
+    String changeType = parts[currentIndex];
+    currentIndex++;
+    
+    List<String> changeParts = [];
+    while (currentIndex < parts.length && !_isChangeIndicator(parts[currentIndex])) {
+      changeParts.add(parts[currentIndex]);
+      currentIndex++;
+    }
+    
+    String changeTypeText = _translateChangeType(changeType);
+    String changeContent = _translateWeatherGroup(changeParts);
+    
+    return '$changeTypeText：$changeContent';
+  }
+  
+  bool _isChangeIndicator(String part) {
+    return part.startsWith('BECMG') || 
+           part.startsWith('TEMPO') || 
+           part.startsWith('FM') || 
+           part.startsWith('PROB');
+  }
+  
+  String _translateChangeType(String changeType) {
+    if (changeType.startsWith('BECMG')) {
+      return '逐渐变化';
+    } else if (changeType.startsWith('TEMPO')) {
+      return '短时变化';
+    } else if (changeType.startsWith('FM')) {
+      return '从${_parseFromTime(changeType)}起';
+    } else if (changeType.startsWith('PROB')) {
+      String prob = changeType.length >= 6 ? changeType.substring(4, 6) : '??';
+      return '概率${prob}%';
+    }
+    return changeType;
+  }
+  
+  String _parseFromTime(String fmCode) {
+    if (!fmCode.startsWith('FM') || fmCode.length < 8) return fmCode;
+    
+    try {
+      int day = int.parse(fmCode.substring(2, 4));
+      int hour = int.parse(fmCode.substring(4, 6));
+      int minute = int.parse(fmCode.substring(6, 8));
+      return '$day日$hour时${minute}分';
+    } catch (e) {
+      return fmCode;
+    }
+  }
+  
+  String _translateWeatherGroup(List<String> group) {
+    if (group.isEmpty) return '';
+    
+    List<String> result = [];
+    
+    // 使用METAR解析器来解析天气组
+    String groupStr = group.join(' ');
+    MetarParser parser = MetarParser(groupStr);
+    
+    // 风向风速
+    String? wind = parser.getWindInfo();
+    if (wind != null) {
+      result.add(wind);
+    }
+    
+    // 能见度
+    String? visibility = parser.getVisibilityInfo();
+    if (visibility != null) {
+      result.add(visibility);
+    }
+    
+    // 天气现象
+    List<String> weather = parser.getWeatherPhenomena();
+    if (weather.isNotEmpty) {
+      result.add('天气现象：${weather.join('、')}');
+    }
+    
+    // 云层
+    List<String> clouds = parser.getCloudInfo();
+    if (clouds.isNotEmpty) {
+      result.add('云层：${clouds.join('、')}');
+    }
+    
+    return result.join('，');
   }
 }

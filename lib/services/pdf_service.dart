@@ -3,10 +3,17 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:internet_file/internet_file.dart';
+import 'package:internet_file/storage_io.dart';
 import '../services/auth_service.dart';
 
 class PdfService {
   static const int maxRetries = 3;
+  
+  // 为了兼容性，添加downloadPdf方法
+  Future<String> downloadPdf(String url, String title) async {
+    return await downloadAndSavePdf(url);
+  }
   
   Future<String> downloadAndSavePdf(
     String url, {
@@ -20,29 +27,50 @@ class PdfService {
       return file.path;
     }
 
-    final client = HttpClient()
-      ..badCertificateCallback = (cert, host, port) => true;
-
     try {
-      final request = await client.getUrl(Uri.parse(url));
-      final headers = await getRequestHeaders();
-      headers.forEach((key, value) => request.headers.set(key, value));
-      
-      final response = await request.close();
-      final total = response.contentLength;
-      var received = 0;
-      
-      final output = file.openWrite();
-      await for (final chunk in response) {
-        received += chunk.length;
-        output.add(chunk);
-        onProgress?.call(received, total);
+      int currentRetries = 0;
+      while (currentRetries < maxRetries) {
+        try {
+          // 获取认证头信息
+          final headers = await getRequestHeaders();
+          
+          // 使用internet_file包下载PDF文件
+          await InternetFile.get(
+            url,
+            headers: headers,
+            storage: InternetFileStorageIO(),
+            storageAdditional: InternetFileStorageIO().additional(
+              filename: filename,
+              location: dir.path,
+            ),
+            progress: (received, total) {
+              onProgress?.call(received, total);
+            },
+          );
+          
+          // Add a small delay to allow the file system to update its metadata.
+          await Future.delayed(Duration(milliseconds: 500));
+          if (await file.exists()) {
+            print('flutter: PDF文件下载完成，延迟后文件大小: ${await file.length()} 字节');
+          }
+          return file.path;
+        } catch (e) {
+          currentRetries++;
+          if (currentRetries >= maxRetries) {
+            rethrow;
+          }
+          // Optional: Add a delay before retrying
+          await Future.delayed(Duration(seconds: 2));
+        }
       }
-      await output.close();
-      
-      return file.path;
-    } finally {
-      client.close();
+      // This line should ideally not be reached if rethrow is used above, but as a fallback
+      throw Exception('Failed to download PDF after multiple retries');
+    } catch (e) {
+      // 如果下载失败，删除可能部分下载的文件
+      if (await file.exists()) {
+        await file.delete();
+      }
+      rethrow;
     }
   }
 

@@ -16,7 +16,15 @@ class ThemeService {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    final themeIndex = prefs.getInt('theme_mode') ?? 0;
+    int themeIndex;
+    final dynamic storedValue = prefs.get(_themeKey);
+    if (storedValue is int) {
+      themeIndex = storedValue;
+    } else if (storedValue is String) {
+      themeIndex = int.tryParse(storedValue) ?? 0;
+    } else {
+      themeIndex = 0;
+    }
     themeNotifier.value = ThemeMode.values[themeIndex];
     
     // 初始化自动收起侧边栏设置，默认为true
@@ -26,7 +34,15 @@ class ThemeService {
 
   Future<ThemeMode> getThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final themeIndex = prefs.getInt('theme_mode') ?? 0;
+    final storedValue = prefs.get(_themeKey);
+    int themeIndex;
+    if (storedValue is int) {
+      themeIndex = storedValue;
+    } else if (storedValue is String) {
+      themeIndex = int.tryParse(storedValue) ?? 0;
+    } else {
+      themeIndex = 0;
+    }
     return ThemeMode.values[themeIndex];
   }
 

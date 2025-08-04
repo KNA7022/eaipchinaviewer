@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/weather_service.dart';
+import '../services/airport_service.dart';
 import '../models/weather_model.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
@@ -13,9 +14,11 @@ class WeatherScreen extends StatefulWidget {
 
 class _WeatherScreenState extends State<WeatherScreen> {
   final _weatherService = WeatherService();
+  final _airportService = AirportService();
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   WeatherData? _weatherData;
+  AirportInfo? _airportInfo;
   bool _isLoading = false;
   bool _isUsingCachedData = false;
   String? _error;
@@ -30,6 +33,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     
     // 应用启动时清理过期缓存
     _weatherService.clearExpiredCache();
+    _airportService.clearExpiredCache();
   }
 
   @override
@@ -87,10 +91,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
     });
 
     try {
-      final weather = await _weatherService.getAirportWeather(icao, forceRefresh: forceRefresh);
+      // 同时获取天气数据和机场信息
+      final results = await Future.wait([
+        _weatherService.getAirportWeather(icao, forceRefresh: forceRefresh),
+        _airportService.getAirportInfo(icao),
+      ]);
+      
+      final weather = results[0] as WeatherData?;
+      final airportInfo = results[1] as AirportInfo?;
+      
       if (weather != null) {
         setState(() {
           _weatherData = weather;
+          _airportInfo = airportInfo;
           _error = null;
           // 检查数据是否来自过期缓存
           final cacheAge = DateTime.now().difference(weather.cacheTime);
@@ -251,13 +264,28 @@ class _WeatherScreenState extends State<WeatherScreen> {
             Wrap(
               spacing: 8,
               children: _recentSearches.map((icao) => 
-                ActionChip(
-                  label: Text(icao),
-                  onPressed: () {
-                    _controller.text = icao;
-                    _searchWeather();
+                FutureBuilder<AirportInfo?>(
+                  future: _airportService.getAirportInfo(icao),
+                  builder: (context, snapshot) {
+                    String displayText = icao;
+                    
+                    if (snapshot.connectionState == ConnectionState.done) {
+                      final airportInfo = snapshot.data;
+                      displayText = airportInfo?.shortDisplayName ?? icao;
+                    }
+                    
+                    return ActionChip(
+                      label: Text(
+                        displayText,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () {
+                        _controller.text = icao;
+                        _searchWeather();
+                      },
+                      avatar: const Icon(Icons.history, size: 16),
+                    );
                   },
-                  avatar: const Icon(Icons.history, size: 16),
                 )
               ).toList(),
             ),
@@ -284,15 +312,34 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on),
-                          const SizedBox(width: 8),
-                          Text(
-                            _weatherData!.icaoId,
-                            style: theme.textTheme.titleLarge,
-                          ),
-                        ],
+                      Flexible(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _airportInfo?.displayName ?? _weatherData!.icaoId,
+                                    style: theme.textTheme.titleLarge,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (_airportInfo != null)
+                                    Text(
+                                      'ICAO: ${_weatherData!.icaoId}${_airportInfo!.iata != null ? ' / IATA: ${_airportInfo!.iata}' : ''}',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       if (_isUsingCachedData)
                         Tooltip(

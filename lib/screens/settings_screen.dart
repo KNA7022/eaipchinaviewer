@@ -22,6 +22,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _cacheSize = '计算中...';
+  Map<String, int> _cacheStats = {'weather': 0, 'airport': 0, 'total': 0};
   ThemeMode _currentThemeMode = ThemeMode.system;
   final _themeService = ThemeService();
   final _updateService = UpdateService();
@@ -33,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _calculateCacheSize();
+    _loadCacheStats();
     _loadThemeMode();
     _loadSponsors();  // 加载捐助者信息
   }
@@ -105,35 +107,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '${(bytes / pow(1024, i)).toStringAsFixed(2)} ${suffixes[i]}';
   }
 
+  Future<void> _loadCacheStats() async {
+    try {
+      final stats = await CacheService.getCacheStats();
+      setState(() {
+        _cacheStats = stats;
+      });
+    } catch (e) {
+      print('加载缓存统计失败: $e');
+    }
+  }
+
   Future<void> _clearCache() async {
     try {
-      // 清理临时目录
-      final tempDir = await getTemporaryDirectory();
-      if (tempDir.existsSync()) {
-        await tempDir.delete(recursive: true);
-        await tempDir.create();
-      }
-      
-      // 清理应用文档目录
-      final appDocDir = await getApplicationDocumentsDirectory();
-      if (appDocDir.existsSync()) {
-        for (var entity in appDocDir.listSync()) {
-          if (entity is File) {
-            await entity.delete();
-          } else if (entity is Directory) {
-            await entity.delete(recursive: true);
-          }
-        }
-      }
-      
-      // 清理应用缓存目录
-      final appCacheDir = await getApplicationCacheDirectory();
-      if (appCacheDir.existsSync()) {
-        await appCacheDir.delete(recursive: true);
-        await appCacheDir.create();
-      }
-
+      await CacheService.clearCache();
       await _calculateCacheSize();
+      await _loadCacheStats();
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('缓存已清除')),
@@ -264,9 +254,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: '存储',
             children: [
               ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('缓存统计'),
+                subtitle: Text(
+                  '天气缓存: ${_cacheStats['weather']} 条\n'
+                  '机场缓存: ${_cacheStats['airport']} 条\n'
+                  'PDF缓存: ${_cacheStats['pdf']} 个\n'
+                  '其他缓存: ${_cacheStats['other_prefs'] ?? 0} 条\n'
+                  '应用缓存: ${_cacheStats['app_cache'] ?? 0} 项\n'
+                  '总计: ${_cacheStats['total']} 项'
+                ),
+                isThreeLine: true,
+              ),
+              ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: const Text('清除缓存'),
-                subtitle: Text('当前缓存: $_cacheSize'),
+                subtitle: Text('文件缓存: $_cacheSize'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showClearCacheDialog(context),
               ),

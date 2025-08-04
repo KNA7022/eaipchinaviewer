@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:typed_data';  
+import 'dart:typed_data';
+import 'dart:async';
 import 'package:http/io_client.dart';
 import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
@@ -8,10 +9,12 @@ import '../services/connectivity_service.dart';
 
 class CaptchaImage extends StatefulWidget {
   final Function(String) onCaptchaIdGenerated;
+  final String? captchaId;
 
   const CaptchaImage({
     super.key,
     required this.onCaptchaIdGenerated,
+    this.captchaId,
   });
 
   @override
@@ -27,6 +30,7 @@ class _CaptchaImageState extends State<CaptchaImage> {
   bool _isLoading = false;
   final ConnectivityService _connectivityService = ConnectivityService();
   bool _isOffline = false;
+  StreamSubscription? _connectivitySubscription;
 
   @override
   void initState() {
@@ -35,14 +39,26 @@ class _CaptchaImageState extends State<CaptchaImage> {
     _loadCaptcha();
   }
 
+  @override
+  void didUpdateWidget(CaptchaImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.captchaId != oldWidget.captchaId && 
+        widget.captchaId != null && 
+        widget.captchaId!.isNotEmpty) {
+      _loadCaptcha();
+    }
+  }
+
   void _setupConnectivity() {
-    _connectivityService.onConnectivityChanged.listen((isOnline) {
-      setState(() {
-        _isOffline = !isOnline;
-        if (isOnline && (_error != null || _imageBytes == null)) {
-          _loadCaptcha();
-        }
-      });
+    _connectivitySubscription = _connectivityService.onConnectivityChanged.listen((isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOffline = !isOnline;
+          if (isOnline && (_error != null || _imageBytes == null)) {
+            _loadCaptcha();
+          }
+        });
+      }
     });
   }
 
@@ -55,17 +71,23 @@ class _CaptchaImageState extends State<CaptchaImage> {
 
   Future<void> _loadCaptcha() async {
     if (_isOffline) {
-      setState(() {
-        _isLoading = false;
-        _error = 'No internet connection';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'No internet connection';
+        });
+      }
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
     
     try {
-      final captchaId = DateTime.now().millisecondsSinceEpoch.toString();
+      final captchaId = (widget.captchaId != null && widget.captchaId!.isNotEmpty) 
+          ? widget.captchaId! 
+          : DateTime.now().millisecondsSinceEpoch.toString();
       widget.onCaptchaIdGenerated(captchaId);
       
       // 使用自定义client发送请求
@@ -79,20 +101,27 @@ class _CaptchaImageState extends State<CaptchaImage> {
         // 直接使用响应的二进制数据作为图片源
         _imageBytes = response.bodyBytes;
         _imageUrl = null; // 不再使用URL直接加载
-        setState(() => _error = null);
+        if (mounted) {
+          setState(() => _error = null);
+        }
       } else {
         throw Exception('验证码获取失败: ${response.statusCode}');
       }
     } catch (e) {
       print('加载验证码失败: $e');
-      setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _connectivityService.dispose();
     super.dispose();
   }
@@ -111,7 +140,9 @@ class _CaptchaImageState extends State<CaptchaImage> {
             Text(_error!, style: TextStyle(color: Colors.red)),
             TextButton(
               onPressed: () {
-                setState(() => _error = null);
+                if (mounted) {
+                  setState(() => _error = null);
+                }
                 _loadCaptcha();
               },
               child: const Text('重新加载'),

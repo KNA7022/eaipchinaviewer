@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _captchaController = TextEditingController();
-  String _captchaId = '';
+  String _captchaId = DateTime.now().millisecondsSinceEpoch.toString();
   bool _isLoading = false;
   String? _errorMessage;
   final ConnectivityService _connectivityService = ConnectivityService();
@@ -57,12 +57,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // 表单验证失败时也刷新验证码
+      _captchaController.clear();
+      _refreshCaptcha();
+      return;
+    }
 
     if (_isOffline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('无网络连接，请检查网络后重试')),
       );
+      // 网络离线时也刷新验证码
+      _captchaController.clear();
+      _refreshCaptcha();
       return;
     }
 
@@ -119,6 +127,8 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         _errorMessage = '网络错误，请重试';
+        _captchaController.clear();
+        _refreshCaptcha();
       });
     } finally {
       if (mounted) {
@@ -227,6 +237,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Card(
                                     elevation: 2,
                                     child: CaptchaImage(
+                                      key: ValueKey(_captchaId),
+                                      captchaId: _captchaId,
                                       onCaptchaIdGenerated: (id) => _captchaId = id,
                                     ),
                                   ),

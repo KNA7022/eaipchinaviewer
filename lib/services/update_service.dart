@@ -131,7 +131,17 @@ class UpdateService {
     // 开始下载
     _startDownload(context, url, fileName, task);
   }
-  static const String _updateUrl = 'https://gitee.com/KNA7022/eaipchinaviewerupdate/raw/master/version.json';
+  // 根据平台选择不同的更新URL
+  static String get _updateUrl {
+    if (Platform.isWindows) {
+      return 'https://gitee.com/KNA7022/eaipchinaviewerupdate/raw/master/version_windows.json';
+    } else if (Platform.isAndroid) {
+      return 'https://gitee.com/KNA7022/eaipchinaviewerupdate/raw/master/version_android.json';
+    } else {
+      // 其他平台使用通用版本文件
+      return 'https://gitee.com/KNA7022/eaipchinaviewerupdate/raw/master/version.json';
+    }
+  }
   
   // 添加标记，避免重复检查
   bool _isCheckingForUpdates = false;
@@ -246,12 +256,65 @@ class UpdateService {
     return false; // 版本相同
   }
   
-  Future<void> downloadAndInstallUpdate(BuildContext context, String apkUrl) async {
-    // 验证 APK URL
-    if (apkUrl.isEmpty) {
+  Future<void> downloadAndInstallUpdate(BuildContext context, String updateUrl) async {
+    // 验证更新URL
+    if (updateUrl.isEmpty) {
       _showErrorDialog('无法获取下载地址');
       return;
     }
+    
+    // Windows平台直接打开下载链接
+    if (Platform.isWindows) {
+      await _handleWindowsUpdate(context, updateUrl);
+      return;
+    }
+    
+    // Android平台使用APK下载安装逻辑
+    if (Platform.isAndroid) {
+      await _handleAndroidUpdate(context, updateUrl);
+      return;
+    }
+    
+    // 其他平台暂不支持自动更新
+    _showErrorDialog('当前平台暂不支持自动更新，请手动下载');
+  }
+  
+  Future<void> _handleWindowsUpdate(BuildContext context, String updateUrl) async {
+    try {
+      // Windows平台直接打开下载链接
+      final Uri uri = Uri.parse(updateUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        
+        // 显示提示对话框
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('更新提示'),
+              content: const Text(
+                '已为您打开下载页面，请下载新版本并手动安装。\n\n'
+                '安装完成后，建议重启应用以确保更新生效。'
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        _showErrorDialog('无法打开下载链接，请手动复制链接到浏览器下载');
+      }
+    } catch (e) {
+      print('Windows更新处理失败: $e');
+      _showErrorDialog('打开下载链接失败，请手动下载更新');
+    }
+  }
+  
+  Future<void> _handleAndroidUpdate(BuildContext context, String apkUrl) async {
     
     // 进度值
     ValueNotifier<double> progressValue = ValueNotifier<double>(0.0);

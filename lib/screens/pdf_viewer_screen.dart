@@ -13,9 +13,9 @@ class PdfViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PdfViewerPlatform.create(
+    return PdfViewerPlatform(
       key: ValueKey(url), // 添加 key 以强制重建
-      url: url,
+      pdfUrl: url,
       title: title,
       showAppBar: false, 
     );

@@ -23,7 +23,9 @@ class ConnectivityService {
 
   void _updateState(ConnectivityResult result) {
     _isOnline = result != ConnectivityResult.none;
-    _controller.add(_isOnline);
+    if (!_controller.isClosed) {
+      _controller.add(_isOnline);
+    }
   }
 
   void dispose() {
