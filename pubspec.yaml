@@ -26,6 +26,9 @@ dependencies:
   connectivity_plus: ^5.0.2
   flutter_markdown: ^0.6.20
   package_info_plus: ^5.0.1
+  fl_chart: ^0.66.2  # 用于创建各种图表
+  syncfusion_flutter_charts: ^24.2.9  # 专业图表库
+  syncfusion_flutter_gauges: ^24.2.9  # 仪表盘和指针图表
 
 dev_dependencies:
   flutter_test:

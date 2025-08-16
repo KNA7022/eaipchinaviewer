@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/weather_service.dart';
 import '../services/airport_service.dart';
 import '../models/weather_model.dart';
+import '../widgets/weather_visualization.dart';
+import '../utils/weather_data_parser.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
@@ -379,6 +381,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
           ),
           const SizedBox(height: 16),
 
+          // 气象数据可视化组件
+          _buildWeatherVisualization(),
+          const SizedBox(height: 16),
+
           // METAR信息卡片
           _buildSection(
             title: '实时天气',
@@ -399,6 +405,31 @@ class _WeatherScreenState extends State<WeatherScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildWeatherVisualization() {
+    if (_weatherData == null) return const SizedBox.shrink();
+    
+    return Column(
+      children: [
+        // 风向风速可视化
+        WindVisualizationWidget(weatherData: _weatherData!),
+        const SizedBox(height: 8),
+        
+        // 能见度和云底高度可视化
+        Row(
+          children: [
+            Expanded(
+              child: VisibilityLevelWidget(weatherData: _weatherData!),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: CloudHeightWidget(weatherData: _weatherData!),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
