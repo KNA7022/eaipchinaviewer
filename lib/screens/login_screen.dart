@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/captcha_image.dart';
-import '../services/connectivity_service.dart';  // 添加这行
+import '../services/connectivity_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -277,6 +278,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                         )
                                       : const Text('登 录'),
                                 ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: () {
+                                  // 复制链接到剪贴板
+                                  const registerUrl = 'https://www.eaipchina.cn/#/register';
+                                  Clipboard.setData(const ClipboardData(text: registerUrl));
+                                  
+                                  // 显示提示
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('由于网站布局原因，请使用电脑访问注册页面。链接已复制到剪贴板。'),
+                                      duration: Duration(seconds: 5),
+                                    ),
+                                  );
+                                },
+                                child: const Text('没有账号？点击注册'),
                               ),
                             ],
                           ),
