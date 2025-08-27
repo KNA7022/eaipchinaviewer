@@ -57,7 +57,85 @@ class WindVisualizationWidget extends WeatherVisualizationWidget {
   State<WindVisualizationWidget> createState() => _WindVisualizationWidgetState();
 }
 
-class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisualizationWidget> {
+class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisualizationWidget> with SingleTickerProviderStateMixin {
+  // 添加动画控制器，用于VRB（不定风向）的旋转动画
+  late AnimationController _animationController;
+  double _currentVrbDirection = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // 初始化动画控制器
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8), // 8秒旋转一周
+    );
+    
+    // 延迟初始化，确保数据已加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAnimation();
+    });
+  }
+  
+  void _initializeAnimation() {
+    try {
+      // 确保组件仍然挂载
+      if (!mounted) return;
+      
+      final windData = getCachedData<WindVisualizationData>('windData', () => _parseWindData());
+      
+      // 无论如何，先停止动画并移除监听器
+      _animationController.stop();
+      _animationController.removeListener(_updateVrbDirection);
+      
+      // 如果是不定风向，启动动画
+      if (windData.isVariable) {
+        _animationController.addListener(_updateVrbDirection);
+        _animationController.repeat();
+      } else {
+        // 如果不是不定风向，确保使用固定方向值
+        setState(() {
+          _currentVrbDirection = windData.direction;
+        });
+      }
+    } catch (e) {
+      print('初始化风向动画错误: $e');
+    }
+  }
+  
+  void _updateVrbDirection() {
+    // 检查组件是否已挂载，避免在组件销毁后调用setState
+    if (mounted) {
+      setState(() {
+        // 根据动画值更新VRB方向，实现360度旋转
+        _currentVrbDirection = _animationController.value * 360;
+      });
+    }
+  }
+  
+  @override
+  void didUpdateWidget(WindVisualizationWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 如果数据发生变化，重新初始化动画
+    if (oldWidget.weatherData.rawMetar != widget.weatherData.rawMetar) {
+      // 使用延迟回调确保状态已更新
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _initializeAnimation();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // 在销毁前移除监听器，避免在组件销毁后调用setState
+    _animationController.removeListener(_updateVrbDirection);
+    _animationController.dispose();
+    super.dispose();
+  }
+  
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -99,18 +177,21 @@ class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisual
     try {
       final windData = getCachedData<WindVisualizationData>('windData', () => _parseWindData());
       
-      if (windData.isCalm || (windData.direction == 0 && windData.speed == 0)) {
+      // 只有在确认是静风时才显示静风界面
+      // 不定风向(VRB)不是静风，应该显示风向风速图表
+      if (windData.isCalm || (windData.speed == 0)) {
         return _buildCalmWindDisplay(context);
       }
       
       return Column(
         children: [
           SizedBox(
-            height: 200,
+            height: 250, // 增加高度，使圆环更大
             child: _buildWindChart(context, windData),
           ),
           const SizedBox(height: 8),
           _buildWindInfo(context, windData),
+          // 移除重复的不定风向指示，因为已经在_buildWindInfo中显示
         ],
       );
     } catch (e) {
@@ -120,103 +201,167 @@ class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisual
   }
 
   Widget _buildWindChart(BuildContext context, WindVisualizationData windData) {
+    // 确定风向值 - 如果是不定风向(VRB)，使用动画值
+    final double directionValue = windData.isVariable ? _currentVrbDirection : windData.direction;
+    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 800),
       curve: Curves.easeInOut,
+      width: double.infinity, // 确保容器占据所有可用宽度
+      constraints: const BoxConstraints(minWidth: 300), // 设置最小宽度约束
       child: gauges.SfRadialGauge(
+
         axes: <gauges.RadialAxis>[
           gauges.RadialAxis(
             minimum: 0,
             maximum: 360,
-            showLabels: true,
+            startAngle: 270, // 从顶部开始
+            endAngle: 270,   // 结束于顶部，形成完整圆环
+            radiusFactor: 0.95, // 增加半径因子，使圆环更大
+            showLabels: true,  // 显示度数标签
+            labelOffset: 35, // 进一步增加标签偏移量，使其更靠近外部
+            labelsPosition: gauges.ElementsPosition.outside, // 标签位置在外部
             showTicks: true,
             ticksPosition: gauges.ElementsPosition.outside,
-            labelsPosition: gauges.ElementsPosition.outside,
+            majorTickStyle: const gauges.MajorTickStyle(
+              length: 15, // 增加刻度线长度以适应标签
+              thickness: 1.5,
+              color: Colors.grey,
+            ),
+            minorTickStyle: const gauges.MinorTickStyle(
+              length: 8, // 增加刻度线长度以适应标签
+              thickness: 1,
+              color: Colors.grey,
+            ),
             ranges: <gauges.GaugeRange>[
               gauges.GaugeRange(
                 startValue: 0,
                 endValue: 90,
-                color: Colors.blue.withOpacity(0.2),
+                color: Colors.blue.withOpacity(0.1),
                 startWidth: 10,
                 endWidth: 10,
               ),
               gauges.GaugeRange(
                 startValue: 90,
                 endValue: 180,
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withOpacity(0.1),
                 startWidth: 10,
                 endWidth: 10,
               ),
               gauges.GaugeRange(
                 startValue: 180,
                 endValue: 270,
-                color: Colors.orange.withOpacity(0.2),
+                color: Colors.orange.withOpacity(0.1),
                 startWidth: 10,
                 endWidth: 10,
               ),
               gauges.GaugeRange(
                 startValue: 270,
                 endValue: 360,
-                color: Colors.red.withOpacity(0.2),
+                color: Colors.red.withOpacity(0.1),
                 startWidth: 10,
                 endWidth: 10,
               ),
             ],
             pointers: <gauges.GaugePointer>[
-              gauges.NeedlePointer(
-                value: windData.direction,
-                needleColor: _getWindSpeedColor(windData.speed),
-                needleStartWidth: 1,
-                needleEndWidth: 3,
-                needleLength: 0.8,
-                knobStyle: gauges.KnobStyle(
-                  knobRadius: 6,
-                  color: _getWindSpeedColor(windData.speed),
+              // 添加主刻度线 - 每30度一个
+              for (int i = 0; i < 360; i += 30)
+                gauges.MarkerPointer(
+                  value: i.toDouble(),
+                  markerType: gauges.MarkerType.rectangle,
+                  markerHeight: 15,
+                  markerWidth: 2.5,
+                  color: i == 0 ? Colors.red : Colors.grey[700], // 北向刻度为红色
+                  markerOffset: -5, // 将刻度线放在圆环内部，更靠近边缘
                 ),
+              // 添加次刻度线 - 每10度一个（排除已有的30度刻度）
+              for (int i = 0; i < 360; i += 10)
+                if (i % 30 != 0) // 避免与主刻度重叠
+                  gauges.MarkerPointer(
+                    value: i.toDouble(),
+                    markerType: gauges.MarkerType.rectangle,
+                    markerHeight: 8,
+                    markerWidth: 1.5,
+                    color: Colors.grey[500],
+                    markerOffset: -5, // 将刻度线放在圆环内部，更靠近边缘
+                  ),
+              // 添加长箭头指针 - 更加突出的设计
+              gauges.NeedlePointer(
+                value: directionValue, // 使用可能动画的方向值
+                needleLength: 0.9, // 更长的箭头，占半径的90%
+                needleStartWidth: 3,
+                needleEndWidth: 8,
+                knobStyle: gauges.KnobStyle(
+                  knobRadius: 12,
+                  sizeUnit: gauges.GaugeSizeUnit.logicalPixel,
+                  color: _getWindSpeedColor(windData.speed),
+                  borderColor: Colors.white,
+                  borderWidth: 1.5,
+                ),
+                tailStyle: gauges.TailStyle(
+                  width: 3,
+                  length: 0.2,
+                  color: _getWindSpeedColor(windData.speed).withOpacity(0.7),
+                  borderColor: Colors.white,
+                  borderWidth: 0.5,
+                ),
+                needleColor: _getWindSpeedColor(windData.speed),
+                enableAnimation: !windData.isVariable, // 如果是VRB，不使用内置动画，因为我们使用自定义动画
+                animationDuration: 1000, // 必须大于0，否则会触发断言错误
                 animationType: gauges.AnimationType.easeInCirc,
-                enableAnimation: true,
-                animationDuration: 1000,
               ),
+              // 添加风速值显示在指针上
+              gauges.MarkerPointer(
+                value: directionValue,
+                markerType: gauges.MarkerType.circle,
+                color: Colors.transparent,
+                markerWidth: 1,
+                markerHeight: 1,
+                markerOffset: -60,
+                offsetUnit: gauges.GaugeSizeUnit.logicalPixel,
+              ),
+
             ],
             annotations: <gauges.GaugeAnnotation>[
+
+              // 北方向标记 (N)
               gauges.GaugeAnnotation(
-                widget: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${windData.speed.toStringAsFixed(1)}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _getWindSpeedColor(windData.speed),
-                        ),
-                      ),
-                      Text(
-                        'kt',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
+                angle: 0,
+                positionFactor: 1.05, // 进一步增加位置因子，使其更靠近外部
+                widget: const Text(
+                  'N',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
                 ),
-                angle: 90,
-                positionFactor: 0.1,
               ),
+              // 东方向标记 (E)
+              gauges.GaugeAnnotation(
+                angle: 90,
+                positionFactor: 1.05, // 进一步增加位置因子，使其更靠近外部
+                widget: const Text(
+                  'E',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              // 南方向标记 (S)
+              gauges.GaugeAnnotation(
+                angle: 180,
+                positionFactor: 1.05, // 进一步增加位置因子，使其更靠近外部
+                widget: const Text(
+                  'S',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              // 西方向标记 (W)
+              gauges.GaugeAnnotation(
+                angle: 270,
+                positionFactor: 1.05, // 进一步增加位置因子，使其更靠近外部
+                widget: const Text(
+                  'W',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              // 移除中心风速显示
+              // 移除重复的方向标记，因为已经在上面添加了
             ],
           ),
         ],
@@ -365,13 +510,17 @@ class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisual
                 color: Colors.red[700],
               ),
             ),
-            Text(
-              message,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.red[600],
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.red[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -387,14 +536,32 @@ class _WindVisualizationWidgetState extends WeatherVisualizationState<WindVisual
   }
 
   String _getDirectionText(double direction) {
-    if (direction >= 337.5 || direction < 22.5) return '${direction.toInt()}° (N)';
-    if (direction < 67.5) return '${direction.toInt()}° (NE)';
-    if (direction < 112.5) return '${direction.toInt()}° (E)';
-    if (direction < 157.5) return '${direction.toInt()}° (SE)';
-    if (direction < 202.5) return '${direction.toInt()}° (S)';
-    if (direction < 247.5) return '${direction.toInt()}° (SW)';
-    if (direction < 292.5) return '${direction.toInt()}° (W)';
-    return '${direction.toInt()}° (NW)';
+    // 检查是否为不定风向
+    final windData = getCachedData<WindVisualizationData>('windData', () => _parseWindData());
+    if (windData.isVariable) {
+      return 'VRB (不定风向)';
+    }
+    
+    // 正常风向显示
+    String cardinalDirection;
+    if (direction >= 337.5 || direction < 22.5) {
+      cardinalDirection = 'N';
+    } else if (direction < 67.5) {
+      cardinalDirection = 'NE';
+    } else if (direction < 112.5) {
+      cardinalDirection = 'E';
+    } else if (direction < 157.5) {
+      cardinalDirection = 'SE';
+    } else if (direction < 202.5) {
+      cardinalDirection = 'S';
+    } else if (direction < 247.5) {
+      cardinalDirection = 'SW';
+    } else if (direction < 292.5) {
+      cardinalDirection = 'W';
+    } else {
+      cardinalDirection = 'NW';
+    }
+    return '${direction.toInt()}° ($cardinalDirection)';
   }
 
   WindVisualizationData _parseWindData() {

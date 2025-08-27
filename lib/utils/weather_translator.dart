@@ -105,7 +105,7 @@ class MetarParser {
         
         // 风向
         if (direction == 'VRB') {
-          windInfo.add('风向：不定');
+          windInfo.add('风向：不定风向(VRB)');
         } else if (direction == '000') {
           windInfo.add('风向：静风');
         } else {

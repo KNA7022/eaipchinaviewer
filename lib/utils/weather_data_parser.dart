@@ -24,7 +24,9 @@ class WeatherDataParser {
       
       if (directionStr == 'VRB') {
         isVariable = true;
-        direction = 0; // 可以设置为当前时间的角度来显示旋转效果
+        // VRB表示不定风向，不是风向为0
+        // 为了可视化效果，可以设置一个特殊值或使用当前时间的角度来显示旋转效果
+        direction = DateTime.now().second * 6.0; // 根据当前秒数设置一个0-360的角度
       } else {
         final dirValue = int.parse(directionStr);
         if (dirValue == 0) {
