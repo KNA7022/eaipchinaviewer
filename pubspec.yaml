@@ -1,7 +1,7 @@
 name: eaipchinaviewer
 description: EAIP China Viewer App
 publish_to: 'none'
-version: 1.7.0+10  # 更新到 1.7.0+10，增加平台差异化更新和缓存清理优化
+version: 1.7.1+11  # 更新到 1.7.0+11，增加能见度可视化组件优化
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
