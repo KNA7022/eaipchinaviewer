@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class PolicyScreen extends StatefulWidget {
   final String type;
@@ -47,19 +49,51 @@ class _PolicyScreenState extends State<PolicyScreen> with SingleTickerProviderSt
 
   Future<void> _loadContents() async {
     try {
-      final privacy = await rootBundle.loadString('assets/privacy_policy.md');
-      final terms = await rootBundle.loadString('assets/terms_of_service.md');
-      setState(() {
-        _privacyContent = privacy;
-        _termsContent = terms;
-        _isLoading = false;
-      });
+      // 从网络获取隐私政策
+      final privacyResponse = await http.get(
+        Uri.parse('https://kna7022.cn/privacy/privacy_policy.md'),
+        headers: {
+          'Accept': 'text/plain, text/markdown',
+          'Accept-Charset': 'utf-8',
+        },
+      );
+      
+      // 从网络获取用户协议
+      final termsResponse = await http.get(
+        Uri.parse('https://kna7022.cn/privacy/terms_of_service.md'),
+        headers: {
+          'Accept': 'text/plain, text/markdown',
+          'Accept-Charset': 'utf-8',
+        },
+      );
+      
+      if (privacyResponse.statusCode == 200 && termsResponse.statusCode == 200) {
+        setState(() {
+          // 使用utf8解码确保中文正确显示
+          _privacyContent = utf8.decode(privacyResponse.bodyBytes);
+          _termsContent = utf8.decode(termsResponse.bodyBytes);
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${privacyResponse.statusCode} / ${termsResponse.statusCode}');
+      }
     } catch (e) {
-      setState(() {
-        _privacyContent = '加载失败: $e';
-        _termsContent = '加载失败: $e';
-        _isLoading = false;
-      });
+      // 网络获取失败时，尝试从本地assets加载作为备用
+      try {
+        final privacy = await rootBundle.loadString('assets/privacy_policy.md');
+        final terms = await rootBundle.loadString('assets/terms_of_service.md');
+        setState(() {
+          _privacyContent = privacy;
+          _termsContent = terms;
+          _isLoading = false;
+        });
+      } catch (localError) {
+        setState(() {
+          _privacyContent = '加载失败: 网络错误 $e，本地备用也失败 $localError';
+          _termsContent = '加载失败: 网络错误 $e，本地备用也失败 $localError';
+          _isLoading = false;
+        });
+      }
     }
   }
 
