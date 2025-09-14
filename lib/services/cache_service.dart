@@ -154,8 +154,12 @@ class CacheService {
         final documentsDir = await getApplicationDocumentsDirectory();
         final pdfDir = Directory('${documentsDir.path}/pdfs');
         if (pdfDir.existsSync()) {
-          final files = pdfDir.listSync();
-          pdfCount = files.where((file) => file is File && file.path.endsWith('.pdf')).length;
+          // 递归遍历所有子文件夹（包括版本文件夹）
+          await for (final entity in pdfDir.list(recursive: true)) {
+            if (entity is File && entity.path.endsWith('.pdf')) {
+              pdfCount++;
+            }
+          }
         }
       } catch (e) {
         print('统计PDF缓存失败: $e');

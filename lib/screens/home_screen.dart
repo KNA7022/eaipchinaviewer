@@ -3,7 +3,9 @@ import '../models/aip_model.dart';
 import '../services/api_service.dart';
 import 'pdf_viewer_screen.dart';
 import '../services/auth_service.dart';
-import '../models/version_model.dart';  
+import '../models/version_model.dart'; 
+import '../services/pdf_service.dart'; 
+import '../services/cache_service.dart';
 import 'package:intl/intl.dart';  
 import '../screens/weather_screen.dart'; 
 import '../services/theme_service.dart';
@@ -425,6 +427,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return const SizedBox.shrink();
     }
 
+    // 获取缓存状态
+    final pdfService = PdfService();
     
     // 如果有子项，创建可展开的项（注意：空列表也被认为是空）
     if (item.children.isNotEmpty) {
@@ -443,16 +447,34 @@ class _HomeScreenState extends State<HomeScreen> {
             initiallyExpanded: false,  // 确保初始状态为折叠
             maintainState: false,      // 不保持展开状态
             controlAffinity: ListTileControlAffinity.leading,
-            trailing: item.pdfPath?.isNotEmpty == true
-                ? IconButton(
-                    icon: Icon(
-                      Icons.picture_as_pdf,
-                      color: _selectedPdfUrl == item.pdfPath 
-                          ? Theme.of(context).primaryColor 
-                          : Colors.grey,
-                    ),
-                    onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
-                    tooltip: '查看PDF',
+            trailing: item.pdfPath != null && item.pdfPath!.isNotEmpty
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FutureBuilder<bool>(
+                        future: item.pdfPath != null ? pdfService.isPdfCached(item.pdfPath!, version: _currentVersion) : Future.value(false),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data == true) {
+                            return const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 16,
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.picture_as_pdf,
+                          color: _selectedPdfUrl == item.pdfPath 
+                              ? Theme.of(context).primaryColor 
+                              : Colors.grey,
+                        ),
+                        onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
+                        tooltip: '查看PDF',
+                      ),
+                    ],
                   )
                 : null,
             title: Text(
@@ -488,16 +510,34 @@ class _HomeScreenState extends State<HomeScreen> {
           fontWeight: _selectedTitle == item.nameCn ? FontWeight.bold : null,
         ),
       ),
-      trailing: item.pdfPath?.isNotEmpty == true
-          ? IconButton(
-              icon: Icon(
-                Icons.picture_as_pdf,
-                color: _selectedPdfUrl == item.pdfPath 
-                    ? Theme.of(context).primaryColor 
-                    : Colors.grey,
-              ),
-              onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
-              tooltip: '查看PDF',
+      trailing: item.pdfPath != null && item.pdfPath!.isNotEmpty
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FutureBuilder<bool>(
+                  future: item.pdfPath != null ? pdfService.isPdfCached(item.pdfPath!, version: _currentVersion) : Future.value(false),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 16,
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.picture_as_pdf,
+                    color: _selectedPdfUrl == item.pdfPath 
+                        ? Theme.of(context).primaryColor 
+                        : Colors.grey,
+                  ),
+                  onPressed: () => _handlePdfSelect(item.pdfPath, item.nameCn),
+                  tooltip: '查看PDF',
+                ),
+              ],
             )
           : null,
     );
@@ -686,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 右侧主内容区
                   Expanded(
                     child: _selectedPdfUrl != null
-                        ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '')
+                        ? PdfViewerScreen(url: _selectedPdfUrl!, title: _selectedTitle ?? '', version: _currentVersion)
                         : const Center(child: Text('请选择要查看的文档')),
                   ),
                 ],

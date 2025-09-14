@@ -243,6 +243,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+              // 自动清理过期缓存设置
+              ValueListenableBuilder<bool>(
+                valueListenable: _themeService.autoCleanExpiredCacheNotifier,
+                builder: (context, autoCleanExpiredCache, child) {
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.auto_delete),
+                    title: const Text('自动清理过期航图缓存'),
+                    subtitle: const Text('应用启动时自动删除过期版本的航图缓存'),
+                    value: autoCleanExpiredCache,
+                    onChanged: (value) {
+                      _themeService.setAutoCleanExpiredCache(value);
+                    },
+                  );
+                },
+              ),
             ],
           ),
 

@@ -4,11 +4,13 @@ import '../platform/pdf_viewer_platform.dart';
 class PdfViewerScreen extends StatelessWidget {
   final String url;
   final String title;
+  final String? version;
 
   const PdfViewerScreen({
     super.key,
     required this.url,
     required this.title,
+    this.version,
   });
 
   @override
@@ -17,6 +19,7 @@ class PdfViewerScreen extends StatelessWidget {
       key: ValueKey(url), // 添加 key 以强制重建
       pdfUrl: url,
       title: title,
+      version: version,
       showAppBar: false, 
     );
   }

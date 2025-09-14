@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/weather_service.dart';
 import 'services/theme_service.dart';
+import 'services/pdf_service.dart';
+import 'services/api_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/settings_screen.dart';
@@ -25,6 +27,9 @@ void main() async {
   final themeService = ThemeService();
   await themeService.init();  // 初始化主题服务
   
+  // 检查并执行自动清理过期PDF缓存
+  await _performAutoCleanup(themeService);
+  
   final prefs = await SharedPreferences.getInstance();
   final isFirstRun = prefs.getBool('first_run') ?? true;
   final isLoggedIn = await AuthService().isLoggedIn();
@@ -42,6 +47,42 @@ Future<void> _loadFonts() async {
     await rootBundle.load('assets/fonts/NotoSansSC-Bold.otf');
   } catch (e) {
     print('字体加载失败: $e');
+  }
+}
+
+// 执行自动清理过期缓存
+Future<void> _performAutoCleanup(ThemeService themeService) async {
+  try {
+    // 检查用户是否启用了自动清理功能
+    final autoCleanEnabled = await themeService.getAutoCleanExpiredCache();
+    
+    if (autoCleanEnabled) {
+      print('开始自动清理过期航图缓存...');
+      
+      final pdfService = PdfService();
+      final apiService = ApiService();
+      
+      // 尝试获取版本列表信息
+      List<dynamic>? versionList;
+      try {
+        final packageData = await apiService.getPackageList();
+        if (packageData != null && packageData['data'] != null) {
+          versionList = packageData['data']['data'] as List<dynamic>?;
+          print('获取到版本列表，共 ${versionList?.length ?? 0} 个版本');
+        }
+      } catch (e) {
+        print('获取版本列表失败，将使用时间判断: $e');
+      }
+      
+      // 执行清理，传入版本列表信息
+      await pdfService.cleanExpiredCache(null, versionList: versionList);
+      
+      print('自动清理过期航图缓存完成');
+    } else {
+      print('自动清理过期缓存功能已禁用');
+    }
+  } catch (e) {
+    print('自动清理过期缓存失败: $e');
   }
 }
 

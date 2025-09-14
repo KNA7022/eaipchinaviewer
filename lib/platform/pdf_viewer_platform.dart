@@ -21,6 +21,7 @@ class PdfViewerPlatform extends StatefulWidget {
   final String title;
   final bool showAppBar;
   final bool isLocalFile;
+  final String? version;
 
   const PdfViewerPlatform({
     Key? key,
@@ -28,6 +29,7 @@ class PdfViewerPlatform extends StatefulWidget {
     required this.title,
     this.showAppBar = true,
     this.isLocalFile = false,
+    this.version,
   }) : super(key: key);
 
   @override
@@ -144,6 +146,7 @@ class _PdfViewerPlatformState extends State<PdfViewerPlatform> {
         final pdfService = PdfService();
         filePath = await pdfService.downloadAndSavePdf(
           widget.pdfUrl,
+          version: widget.version,
           onProgress: (current, total) {
             if (mounted && total > 0) {
               setState(() {
