@@ -916,42 +916,75 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment<int>(
-                        value: 0,
-                        label: Text('AIP'),
-                        icon: Icon(Icons.book),
-                      ),
-                      ButtonSegment<int>(
-                        value: 1,
-                        label: Text('SUP'),
-                        icon: Icon(Icons.new_releases),
-                      ),
-                      ButtonSegment<int>(
-                        value: 2,
-                        label: Text('AIC'),
-                        icon: Icon(Icons.info),
-                      ),
-                      ButtonSegment<int>(
-                        value: 3,
-                        label: Text('NOTAM'),
-                        icon: Icon(Icons.notifications),
-                      ),
-                    ],
-                    selected: {_displayType},
-                    onSelectionChanged: (Set<int> newSelection) {
-                      setState(() {
-                        _displayType = newSelection.first;
-                        _searchController.clear();
-                        _searchQuery = '';
-                        _isSearching = false;
-                        _filteredItems.clear();
-                        _filteredSupItems.clear();
-                        _filteredAicItems.clear();
-                        _filteredNotamItems.clear();
-                      });
-                    },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8.0),
+                      border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.5)),
+                    ),
+                    child: DropdownButton<int>(
+                      value: _displayType,
+                      isExpanded: true,
+                      underline: const SizedBox(), // 移除下划线
+                      icon: const Icon(Icons.arrow_drop_down),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 0,
+                          child: Row(
+                            children: [
+                              Icon(Icons.book, size: 20),
+                              SizedBox(width: 8),
+                              Text('AIP'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Row(
+                            children: [
+                              Icon(Icons.new_releases, size: 20),
+                              SizedBox(width: 8),
+                              Text('SUP'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 2,
+                          child: Row(
+                            children: [
+                              Icon(Icons.info, size: 20),
+                              SizedBox(width: 8),
+                              Text('AIC'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 3,
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications, size: 20),
+                              SizedBox(width: 8),
+                              Text('NOTAM'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (int? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _displayType = newValue;
+                            _searchController.clear();
+                            _searchQuery = '';
+                            _isSearching = false;
+                            _filteredItems.clear();
+                            _filteredSupItems.clear();
+                            _filteredAicItems.clear();
+                            _filteredNotamItems.clear();
+                          });
+                        }
+                      },
+                    ),
                   ),
                 ),
               ],
