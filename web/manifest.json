@@ -1,6 +1,6 @@
 {
-    "name": "eaipchinaviewer",
-    "short_name": "eaipchinaviewer",
+    "name": "EaipChinaViewer-航图在线查看",
+    "short_name": "EaipChinaViewer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
