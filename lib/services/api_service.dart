@@ -371,4 +371,331 @@ class ApiService {
       return null;
     }
   }
+
+  /// 获取当前版本的SUP数据
+  /// 
+  /// 返回SUP数据列表，如果获取失败返回null
+  Future<List<dynamic>?> getCurrentSupData() async {
+    try {
+      print('开始获取当前版本SUP数据');
+      final packages = await getPackageList();
+      if (packages == null) {
+        print('获取版本列表失败');
+        return null;
+      }
+
+      final List<dynamic> allPackages = packages['data']['data'] as List;
+      final baselinePackages = allPackages.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      if (baselinePackages.isEmpty) {
+        print('没有找到基准版本');
+        return null;
+      }
+
+      // 按生效时间排序，取最新的版本
+      baselinePackages.sort((a, b) => 
+        DateTime.parse(b['effectiveTime']).compareTo(DateTime.parse(a['effectiveTime']))
+      );
+
+      final currentPackage = baselinePackages.first;
+      _currentPackage = currentPackage;
+      return await getSupJson(currentPackage);
+    } catch (e) {
+      print('获取当前SUP数据失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取指定版本的SUP数据
+  /// 
+  /// [version] 版本号，例如：'EAIP2025-09.V1.4'
+  /// 返回SUP数据列表，如果获取失败返回null
+  Future<List<dynamic>?> getSupDataForVersion(String version) async {
+    try {
+      final packages = await getPackageList();
+      if (packages == null) return null;
+
+      final packageList = packages['data']['data'] as List;
+      final baselinePackages = packageList.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      final targetPackage = baselinePackages.firstWhere(
+        (pkg) => pkg['dataName'] == version,
+        orElse: () => null,
+      );
+
+      if (targetPackage != null) {
+        print('切换到版本: ${targetPackage['dataName']}');
+        _currentPackage = targetPackage;
+        return await getSupJson(targetPackage);
+      } else {
+        print('未找到指定的基准版本: $version');
+      }
+    } catch (e) {
+      print('获取版本SUP数据失败: $e');
+    }
+    return null;
+  }
+
+  /// 获取SUP数据
+  /// 
+  /// [packageInfo] 包信息，包含filePath和dataName
+  /// 返回SUP数据列表，如果获取失败返回null
+  Future<List<dynamic>?> getSupJson(Map<String, dynamic> packageInfo) async {
+    try {
+      if (_token == null) {
+        print('获取SUP数据失败：未登录');
+        return null;
+      }
+
+      final headers = Map<String, String>.from(_defaultHeaders)
+        ..addAll({
+          'token': _token!,
+          'Cookie': 'userId=$_userId; username=$_token',
+          'Accept-Charset': 'utf-8', // 确保正确处理中文字符
+        });
+
+      final String basePath = packageInfo["filePath"];
+      final url = "$baseUrl/$basePath/JsonPath/SUP.JSON";
+      
+      print('开始获取SUP数据: $url');
+
+      final client = await _getClient();
+      final response = await client.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      if (response.statusCode != 200) {
+        print('获取SUP数据失败：HTTP ${response.statusCode}');
+        return null;
+      }
+      
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      print('成功获取SUP数据：${data.length} 条记录');
+      return data;
+    } catch (e) {
+      print('获取SUP数据异常: $e');
+      return null;
+    }
+  }
+
+  /// 获取当前版本的SUP数据
+  Future<List<dynamic>?> getCurrentSupStructure() async {
+    return getCurrentSupData();
+  }
+
+  /// 获取指定版本的SUP数据
+  Future<List<dynamic>?> getSupStructureForVersion(String version) async {
+    return getSupDataForVersion(version);
+  }
+
+  /// 获取当前版本的AIC数据
+  Future<List<dynamic>?> getCurrentAicData() async {
+    try {
+      print('开始获取当前版本AIC数据');
+      final packages = await getPackageList();
+      if (packages == null) {
+        print('获取版本列表失败');
+        return null;
+      }
+
+      final List<dynamic> allPackages = packages['data']['data'] as List;
+      final baselinePackages = allPackages.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      if (baselinePackages.isEmpty) {
+        print('没有找到基准版本');
+        return null;
+      }
+
+      // 按生效时间排序，取最新的版本
+      baselinePackages.sort((a, b) => 
+        DateTime.parse(b['effectiveTime']).compareTo(DateTime.parse(a['effectiveTime']))
+      );
+
+      final currentPackage = baselinePackages.first;
+      _currentPackage = currentPackage;
+      return await getAicJson(currentPackage);
+    } catch (e) {
+      print('获取当前AIC数据失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取当前版本的NOTAM数据
+  Future<List<dynamic>?> getCurrentNotamData() async {
+    try {
+      print('开始获取当前版本NOTAM数据');
+      final packages = await getPackageList();
+      if (packages == null) {
+        print('获取版本列表失败');
+        return null;
+      }
+
+      final List<dynamic> allPackages = packages['data']['data'] as List;
+      final baselinePackages = allPackages.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      if (baselinePackages.isEmpty) {
+        print('没有找到基准版本');
+        return null;
+      }
+
+      baselinePackages.sort((a, b) => 
+        DateTime.parse(b['effectiveTime']).compareTo(DateTime.parse(a['effectiveTime']))
+      );
+
+      final currentPackage = baselinePackages.first;
+      _currentPackage = currentPackage;
+      return await getNotamJson(currentPackage);
+    } catch (e) {
+      print('获取当前NOTAM数据失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取指定版本的AIC数据
+  Future<List<dynamic>?> getAicDataForVersion(String version) async {
+    try {
+      final packages = await getPackageList();
+      if (packages == null) return null;
+
+      final packageList = packages['data']['data'] as List;
+      final baselinePackages = packageList.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      final targetPackage = baselinePackages.firstWhere(
+        (pkg) => pkg['dataName'] == version,
+        orElse: () => null,
+      );
+
+      if (targetPackage != null) {
+        print('切换到版本: ${targetPackage['dataName']}');
+        _currentPackage = targetPackage;
+        return await getAicJson(targetPackage);
+      } else {
+        print('未找到指定的基准版本: $version');
+      }
+    } catch (e) {
+      print('获取版本AIC数据失败: $e');
+    }
+    return null;
+  }
+
+  /// 获取AIC数据
+  Future<List<dynamic>?> getAicJson(Map<String, dynamic> packageInfo) async {
+    try {
+      if (_token == null) {
+        print('获取AIC数据失败：未登录');
+        return null;
+      }
+
+      final headers = Map<String, String>.from(_defaultHeaders)
+        ..addAll({
+          'token': _token!,
+          'Cookie': 'userId=$_userId; username=$_token',
+          'Accept-Charset': 'utf-8', // 确保正确处理中文字符
+        });
+
+      final String basePath = packageInfo["filePath"];
+      final url = "$baseUrl/$basePath/JsonPath/AIC.JSON";
+      
+      print('开始获取AIC数据: $url');
+
+      final client = await _getClient();
+      final response = await client.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      if (response.statusCode != 200) {
+        print('获取AIC数据失败：HTTP ${response.statusCode}');
+        return null;
+      }
+      
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      print('成功获取AIC数据：${data.length} 条记录');
+      return data;
+    } catch (e) {
+      print('获取AIC数据异常: $e');
+      return null;
+    }
+  }
+
+  /// 获取NOTAM数据
+  Future<List<dynamic>?> getNotamJson(Map<String, dynamic> packageInfo) async {
+    try {
+      if (_token == null) {
+        print('获取NOTAM数据失败：未登录');
+        return null;
+      }
+
+      final headers = Map<String, String>.from(_defaultHeaders)
+        ..addAll({
+          'token': _token!,
+          'Cookie': 'userId=$_userId; username=$_token',
+          'Accept-Charset': 'utf-8',
+        });
+
+      final String basePath = packageInfo["filePath"];
+      final url = "$baseUrl/$basePath/JsonPath/NOTAM.JSON";
+      
+      print('开始获取NOTAM数据: $url');
+
+      final client = await _getClient();
+      final response = await client.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      if (response.statusCode != 200) {
+        print('获取NOTAM数据失败：HTTP ${response.statusCode}');
+        return null;
+      }
+      
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      print('成功获取NOTAM数据：${data.length} 条记录');
+      return data;
+    } catch (e) {
+      print('获取NOTAM数据异常: $e');
+      return null;
+    }
+  }
+
+  /// 获取当前版本的AIC数据
+  Future<List<dynamic>?> getCurrentAicStructure() async {
+    return getCurrentAicData();
+  }
+
+  /// 获取指定版本的AIC数据
+  Future<List<dynamic>?> getAicStructureForVersion(String version) async {
+    return getAicDataForVersion(version);
+  }
+
+  /// 获取指定版本的NOTAM数据
+  /// 
+  /// [version] 版本号，例如：'EAIP2025-09.V1.4'
+  /// 返回NOTAM数据列表，如果获取失败返回null
+  Future<List<dynamic>?> getNotamDataForVersion(String version) async {
+    try {
+      final packages = await getPackageList();
+      if (packages == null) return null;
+
+      final packageList = packages['data']['data'] as List;
+      final baselinePackages = packageList.where((pkg) => pkg['dataType'] == 'BASELINE').toList();
+
+      final targetPackage = baselinePackages.firstWhere(
+        (pkg) => pkg['dataName'] == version,
+        orElse: () => null,
+      );
+
+      if (targetPackage != null) {
+        print('切换到版本: ${targetPackage['dataName']}');
+        _currentPackage = targetPackage;
+        return await getNotamJson(targetPackage);
+      } else {
+        print('未找到指定的基准版本: $version');
+      }
+    } catch (e) {
+      print('获取版本NOTAM数据失败: $e');
+    }
+    return null;
+  }
 }

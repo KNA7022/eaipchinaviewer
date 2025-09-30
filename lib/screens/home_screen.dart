@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/aic_model.dart';
 import '../models/aip_model.dart';
+import '../models/notam_model.dart';
+import '../models/sup_model.dart';
 import '../services/api_service.dart';
 import 'pdf_viewer_screen.dart';
 import '../services/auth_service.dart';
@@ -21,6 +24,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final List<AipItem> _aipItems = [];
+  final List<SupItem> _supItems = [];
+  final List<AicItem> _aicItems = [];
+  final List<NotamItem> _notamItems = [];
   bool _isLoading = false;
   final double _drawerWidth = 300.0;
   bool _isDrawerOpen = true;
@@ -32,10 +38,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isRefreshCooling = false;
   static const _refreshCooldown = Duration(seconds: 15);
   final List<AipItem> _filteredItems = [];
+  final List<SupItem> _filteredSupItems = [];
+  final List<AicItem> _filteredAicItems = [];
+  final List<NotamItem> _filteredNotamItems = [];
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSearching = false;
   final Map<String, List<AipItem>> _searchIndex = {};
+  // 显示类型：0 = AIP, 1 = SUP, 2 = AIC, 3 = NOTAM
+  int _displayType = 0;
   final _themeService = ThemeService();
   final ScrollController _sidebarScrollController = ScrollController();
   double _lastScrollPosition = 0;
@@ -183,15 +194,25 @@ class _HomeScreenState extends State<HomeScreen> {
       _searchQuery = '';
       _isSearching = false;
       _filteredItems.clear();
+      _filteredSupItems.clear();
     });
     
     try {
       final api = ApiService();
-      final List<dynamic>? data = await api.getAipStructureForVersion(version);
+      final Future<List<dynamic>?> aipFuture = api.getAipStructureForVersion(version);
+      final Future<List<dynamic>?> supFuture = api.getSupStructureForVersion(version);
+      final Future<List<dynamic>?> aicFuture = api.getAicStructureForVersion(version);
+      final Future<List<dynamic>?> notamFuture = api.getNotamDataForVersion(version);
+      
+      final results = await Future.wait([aipFuture, supFuture, aicFuture, notamFuture]);
+      final List<dynamic>? aipData = results[0];
+      final List<dynamic>? supData = results[1];
+      final List<dynamic>? aicData = results[2];
+      final List<dynamic>? notamData = results[3];
       
       if (!mounted) return;
 
-      if (data == null) {
+      if (aipData == null) {
         // token失效，直接清除认证数据并跳转到登录页面
         final authService = AuthService();
         await authService.clearAuthData();
@@ -200,18 +221,45 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      final items = data.map((item) => 
+      final aipItems = aipData.map((item) => 
         AipItem.fromJson(item as Map<String, dynamic>)
       ).toList();
       
-      final sortedItems = _sortAndProcessItems(items);
+      final sortedAipItems = _sortAndProcessItems(aipItems);
+      
+      final supItems = supData?.map((item) =>
+        SupItem.fromJson(item as Map<String, dynamic>)
+      ).toList() ?? [];
+      
+      // 按照发布日期降序排序SUP
+      supItems.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+
+      final aicItems = aicData?.map((item) =>
+        AicItem.fromJson(item as Map<String, dynamic>)
+      ).toList() ?? [];
+      
+      // 按照发布日期降序排序AIC
+      aicItems.sort((a, b) => b.pubDate.compareTo(a.pubDate));
       
       if (!mounted) return;
+      final notamItems = notamData?.map((item) =>
+        NotamItem.fromJson(item as Map<String, dynamic>)
+      ).toList() ?? [];
+      
+      // 按照系列名称排序NOTAM
+      notamItems.sort((a, b) => a.seriesName.compareTo(b.seriesName));
+
       setState(() {
         _currentVersion = version;
         _aipItems.clear();
-        _aipItems.addAll(sortedItems);
-        _buildSearchIndex(sortedItems);
+        _aipItems.addAll(sortedAipItems);
+        _supItems.clear();
+        _supItems.addAll(supItems);
+        _aicItems.clear();
+        _aicItems.addAll(aicItems);
+        _notamItems.clear();
+        _notamItems.addAll(notamItems);
+        _buildSearchIndex(sortedAipItems);
         _isLoading = false;
       });
     } catch (e) {
@@ -369,6 +417,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _searchQuery = query.toLowerCase();
       _isSearching = _searchQuery.isNotEmpty;
       _filteredItems.clear();
+      _filteredSupItems.clear();
+      _filteredAicItems.clear();
       
       if (_isSearching) {
         final searchWords = _searchQuery.split(RegExp(r'\s+'))
@@ -376,33 +426,83 @@ class _HomeScreenState extends State<HomeScreen> {
         
         if (searchWords.isEmpty) return;
         
-        // 使用 Set 去重
-        final resultSet = <AipItem>{};
-        
-        // 对每个搜索词进行查找
-        for (var word in searchWords) {
-          // 查找完整词匹配
-          final exactMatches = _searchIndex[word] ?? [];
-          resultSet.addAll(exactMatches);
+        if (_displayType == 1) {
+          // 搜索SUP项
+          _filteredSupItems.addAll(_supItems.where((item) {
+            final searchText = '${item.serial} ${item.localSubject} ${item.subject} ${item.chapterType}'.toLowerCase();
+            return searchWords.any((word) => searchText.contains(word));
+          }));
           
-          // 查找前缀匹配
-          _searchIndex.forEach((key, items) {
-            if (key.startsWith(word)) {
-              resultSet.addAll(items);
+          // 按相关度排序（包含更多搜索词的排在前面）
+          _filteredSupItems.sort((a, b) {
+            final aSearchText = '${a.serial} ${a.localSubject} ${a.subject} ${a.chapterType}'.toLowerCase();
+            final bSearchText = '${b.serial} ${b.localSubject} ${b.subject} ${b.chapterType}'.toLowerCase();
+            final aRelevance = searchWords.where((word) => aSearchText.contains(word)).length;
+            final bRelevance = searchWords.where((word) => bSearchText.contains(word)).length;
+            if (bRelevance != aRelevance) {
+              return bRelevance.compareTo(aRelevance);
             }
+            // 如果相关度相同，按发布日期降序排序
+            return b.pubDate.compareTo(a.pubDate);
+          });
+        } else if (_displayType == 2) {
+          // 搜索AIC项
+          _filteredAicItems.addAll(_aicItems.where((item) {
+            final searchText = '${item.serial} ${item.localSubject} ${item.subject} ${item.chapterType}'.toLowerCase();
+            return searchWords.any((word) => searchText.contains(word));
+          }));
+          
+          // 按相关度排序（包含更多搜索词的排在前面）
+          _filteredAicItems.sort((a, b) {
+            final aSearchText = '${a.serial} ${a.localSubject} ${a.subject} ${a.chapterType}'.toLowerCase();
+            final bSearchText = '${b.serial} ${b.localSubject} ${b.subject} ${b.chapterType}'.toLowerCase();
+            final aRelevance = searchWords.where((word) => aSearchText.contains(word)).length;
+            final bRelevance = searchWords.where((word) => bSearchText.contains(word)).length;
+            if (bRelevance != aRelevance) {
+              return bRelevance.compareTo(aRelevance);
+            }
+            // 如果相关度相同，按发布日期降序排序
+            return b.pubDate.compareTo(a.pubDate);
+          });
+        } else if (_displayType == 3) {
+          // 搜索NOTAM项
+          _filteredNotamItems.clear();
+          _filteredNotamItems.addAll(_notamItems.where((item) {
+            final searchText = '系列${item.seriesName}'.toLowerCase();
+            return searchWords.any((word) => searchText.contains(word));
+          }));
+          
+          // 按系列名称排序
+          _filteredNotamItems.sort((a, b) => a.seriesName.compareTo(b.seriesName));
+        } else {
+          // 使用 Set 去重
+          final resultSet = <AipItem>{};
+          
+          // 对每个搜索词进行查找
+          for (var word in searchWords) {
+            // 查找完整词匹配
+            final exactMatches = _searchIndex[word] ?? [];
+            resultSet.addAll(exactMatches);
+            
+            // 查找前缀匹配
+            _searchIndex.forEach((key, items) {
+              if (key.startsWith(word)) {
+                resultSet.addAll(items);
+              }
+            });
+          }
+          
+          _filteredItems.addAll(resultSet);
+          
+          // 按相关度排序（包含更多搜索词的排在前面）
+          _filteredItems.sort((a, b) {
+            final aRelevance = searchWords.where((word) => 
+              a.nameCn.toLowerCase().contains(word)).length;
+            final bRelevance = searchWords.where((word) => 
+              b.nameCn.toLowerCase().contains(word)).length;
+            return bRelevance.compareTo(aRelevance);
           });
         }
-        
-        _filteredItems.addAll(resultSet);
-        
-        // 按相关度排序（包含更多搜索词的排在前面）
-        _filteredItems.sort((a, b) {
-          final aRelevance = searchWords.where((word) => 
-            a.nameCn.toLowerCase().contains(word)).length;
-          final bRelevance = searchWords.where((word) => 
-            b.nameCn.toLowerCase().contains(word)).length;
-          return bRelevance.compareTo(aRelevance);
-        });
       } else if (_isDrawerOpen) {
         // 如果取消搜索，则恢复之前的位置
         _lastScrollPosition = _scrollPositions[_currentVersion] ?? 0;
@@ -810,13 +910,60 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
+          // 切换按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment<int>(
+                        value: 0,
+                        label: Text('AIP'),
+                        icon: Icon(Icons.book),
+                      ),
+                      ButtonSegment<int>(
+                        value: 1,
+                        label: Text('SUP'),
+                        icon: Icon(Icons.new_releases),
+                      ),
+                      ButtonSegment<int>(
+                        value: 2,
+                        label: Text('AIC'),
+                        icon: Icon(Icons.info),
+                      ),
+                      ButtonSegment<int>(
+                        value: 3,
+                        label: Text('NOTAM'),
+                        icon: Icon(Icons.notifications),
+                      ),
+                    ],
+                    selected: {_displayType},
+                    onSelectionChanged: (Set<int> newSelection) {
+                      setState(() {
+                        _displayType = newSelection.first;
+                        _searchController.clear();
+                        _searchQuery = '';
+                        _isSearching = false;
+                        _filteredItems.clear();
+                        _filteredSupItems.clear();
+                        _filteredAicItems.clear();
+                        _filteredNotamItems.clear();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
           // 搜索框
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: '输入关键词后按回车搜索...',
+                hintText: '搜索${_displayType == 0 ? "航行资料" : _displayType == 1 ? "补充通告" : _displayType == 2 ? "航行通告" : "NOTAM"}...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _isSearching
                     ? IconButton(
@@ -829,15 +976,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
                 border: const OutlineInputBorder(),
               ),
-              textInputAction: TextInputAction.search, // 设置键盘回车键为搜索
-              onSubmitted: _handleSearch, // 按下回车时触发搜索
+              textInputAction: TextInputAction.search,
+              onSubmitted: _handleSearch,
               onChanged: (value) {
-                // 仅更新搜索框状态，不执行搜索
                 setState(() {
                   _searchQuery = value.toLowerCase();
                   _isSearching = _searchQuery.isNotEmpty;
                   if (!_isSearching) {
                     _filteredItems.clear();
+                    _filteredSupItems.clear();
+                    _filteredAicItems.clear();
+                    _filteredNotamItems.clear();
                   }
                 });
               },
@@ -847,15 +996,443 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    key: _sidebarScrollKey,
-                    controller: _sidebarScrollController,
-                    children: (_isSearching ? _filteredItems : _aipItems)
-                        .map((item) => _buildListItem(context, item))
-                        .toList(),
-                  ),
+                : _displayType == 0
+                    ? ListView(
+                        key: _sidebarScrollKey,
+                        controller: _sidebarScrollController,
+                        children: (_isSearching ? _filteredItems : _aipItems)
+                            .map((item) => _buildListItem(context, item))
+                            .toList(),
+                      )
+                    : _displayType == 1
+                        ? ListView.builder(
+                            controller: _sidebarScrollController,
+                            itemCount: _isSearching
+                                ? _filteredSupItems.length
+                                : _supItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _isSearching
+                                  ? _filteredSupItems[index]
+                                  : _supItems[index];
+                              return _buildSupListItem(item);
+                            },
+                          )
+                        : _displayType == 2
+                            ? ListView.builder(
+                                controller: _sidebarScrollController,
+                                itemCount: _isSearching
+                                    ? _filteredAicItems.length
+                                    : _aicItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = _isSearching
+                                      ? _filteredAicItems[index]
+                                      : _aicItems[index];
+                                  return _buildAicListItem(item);
+                                },
+                              )
+                            : ListView.builder(
+                                controller: _sidebarScrollController,
+                                itemCount: _isSearching
+                                    ? _filteredNotamItems.length
+                                    : _notamItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = _isSearching
+                                      ? _filteredNotamItems[index]
+                                      : _notamItems[index];
+                                  return _buildNotamListItem(item);
+                                },
+                              ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSupListItem(SupItem item) {
+    // 获取缓存状态
+    final pdfService = PdfService();
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                     color: item.isModifiedBool ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+                     borderRadius: BorderRadius.circular(4),
+                     border: Border.all(
+                       color: item.isModifiedBool ? Colors.red : Colors.blue,
+                     ),
+                   ),
+                   child: Text(
+                     item.serial,
+                     style: TextStyle(
+                       fontSize: 12,
+                       color: item.isModifiedBool ? Colors.red : Colors.blue,
+                     ),
+                   ),
+                ),
+                const SizedBox(width: 8),
+                if (item.chapterType.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: Text(
+                      item.chapterType,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              item.localSubject,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: _selectedTitle == item.localSubject ? FontWeight.bold : null,
+              ),
+            ),
+            Text(
+              item.subject,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '发布: ${item.formattedPubDate}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '生效: ${item.formattedEffectiveTime}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              if (item.formattedOutDate.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event_busy, size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '失效: ${item.formattedOutDate}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        trailing: item.document.isNotEmpty
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FutureBuilder<bool>(
+                    future: pdfService.isPdfCached(item.document, version: _currentVersion),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data == true) {
+                        return const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 16,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.picture_as_pdf,
+                      color: _selectedPdfUrl == item.document
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                    ),
+                    onPressed: () {
+                      print('flutter: 开始加载SUP PDF: ${item.pdfUrl}');
+                      if (item.pdfUrl != null) {
+                        _handlePdfSelect(item.pdfUrl!, item.localSubject);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('无法加载PDF文件')),
+                        );
+                      }
+                    },
+                    tooltip: '查看PDF',
+                  ),
+                ],
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildAicListItem(AicItem item) {
+    // 获取缓存状态
+    final pdfService = PdfService();
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                     color: item.isModifiedBool ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+                     borderRadius: BorderRadius.circular(4),
+                     border: Border.all(
+                       color: item.isModifiedBool ? Colors.red : Colors.blue,
+                     ),
+                   ),
+                   child: Text(
+                     item.serial,
+                     style: TextStyle(
+                       fontSize: 12,
+                       color: item.isModifiedBool ? Colors.red : Colors.blue,
+                     ),
+                   ),
+                ),
+                const SizedBox(width: 8),
+                if (item.chapterType.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: Text(
+                      item.chapterType,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              item.localSubject,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: _selectedTitle == item.localSubject ? FontWeight.bold : null,
+              ),
+            ),
+            Text(
+              item.subject,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '发布: ${item.formattedPubDate}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '生效: ${item.formattedEffectiveTime}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              if (item.formattedOutDate.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event_busy, size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '失效: ${item.formattedOutDate}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        trailing: item.document.isNotEmpty
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FutureBuilder<bool>(
+                    future: pdfService.isPdfCached(item.document, version: _currentVersion),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data == true) {
+                        return const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 16,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.picture_as_pdf,
+                      color: _selectedPdfUrl == item.document
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                    ),
+                    onPressed: () {
+                      print('flutter: 开始加载AIC PDF: ${item.pdfUrl}');
+                      if (item.pdfUrl != null) {
+                        _handlePdfSelect(item.pdfUrl!, item.localSubject);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('无法加载PDF文件')),
+                        );
+                      }
+                    },
+                    tooltip: '查看PDF',
+                  ),
+                ],
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildNotamListItem(NotamItem item) {
+    // 获取缓存状态
+    final pdfService = PdfService();
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Text(
+                '系列${item.seriesName}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange,
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Row(
+            children: [
+              Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text(
+                '生成时间: ${item.formattedGenerateTime}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+        trailing: item.document.isNotEmpty
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FutureBuilder<bool>(
+                    future: pdfService.isPdfCached(item.document, version: _currentVersion),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data == true) {
+                        return const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 16,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.picture_as_pdf,
+                      color: _selectedPdfUrl == item.document
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                    ),
+                    onPressed: () {
+                      final api = ApiService();
+                      final pdfUrl = api.buildPdfUrl(item.document);
+                      print('flutter: 开始加载NOTAM PDF: $pdfUrl');
+                      if (pdfUrl != null) {
+                        _handlePdfSelect(pdfUrl, '系列${item.seriesName} NOTAM');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('无法加载PDF文件')),
+                        );
+                      }
+                    },
+                    tooltip: '查看PDF',
+                  ),
+                ],
+              )
+            : null,
       ),
     );
   }
