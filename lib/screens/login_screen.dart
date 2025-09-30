@@ -308,6 +308,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '滇ICP备2025058768号-2A',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),

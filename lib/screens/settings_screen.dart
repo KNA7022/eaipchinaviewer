@@ -605,6 +605,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Text('数据来源: https://www.eaipchina.cn/'),
         const SizedBox(height: 8),
         const Text('声明：本应用仅供参考，不作为航行依据。航图数据的最终解释权归中国民航局所有。'),
+        const SizedBox(height: 8),
+        const Text('滇ICP备2025058768号-2A'),
       ],
     );
   }

@@ -60,30 +60,62 @@ class CacheService {
     }
   }
   
+  /// 清理PDF缓存文件（包括版本文件夹中的文件）
   static Future<void> _clearPdfCache() async {
     try {
       final documentsDir = await getApplicationDocumentsDirectory();
       final pdfDir = Directory('${documentsDir.path}/pdfs');
       
       if (pdfDir.existsSync()) {
-        final files = pdfDir.listSync();
         int deletedCount = 0;
+        int deletedFolders = 0;
         
-        for (final file in files) {
+        // 递归遍历所有文件和文件夹
+        await for (final entity in pdfDir.list(recursive: true)) {
+          try {
+            if (entity is File && entity.path.endsWith('.pdf')) {
+              await entity.delete();
+              deletedCount++;
+            } else if (entity is Directory) {
+              // 检查文件夹是否为空，如果为空则删除
+              final isEmpty = await _isDirectoryEmpty(entity);
+              if (isEmpty) {
+                await entity.delete();
+                deletedFolders++;
+              }
+            }
+          } catch (e) {
+            print('删除缓存项失败: ${entity.path}, 错误: $e');
+          }
+        }
+        
+        // 清理根目录下的直接PDF文件（兼容旧版本）
+        final rootFiles = pdfDir.listSync(recursive: false);
+        for (final file in rootFiles) {
           if (file is File && file.path.endsWith('.pdf')) {
             try {
               await file.delete();
               deletedCount++;
             } catch (e) {
-              print('删除PDF文件失败: ${file.path}, 错误: $e');
+              print('删除根目录PDF文件失败: ${file.path}, 错误: $e');
             }
           }
         }
         
-        print('已清理 $deletedCount 个PDF缓存文件');
+        print('已清理 $deletedCount 个PDF缓存文件和 $deletedFolders 个空文件夹');
       }
     } catch (e) {
       print('清理PDF缓存失败: $e');
+    }
+  }
+  
+  /// 检查目录是否为空
+  static Future<bool> _isDirectoryEmpty(Directory dir) async {
+    try {
+      final contents = await dir.list().toList();
+      return contents.isEmpty;
+    } catch (e) {
+      return false;
     }
   }
   
