@@ -310,7 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '滇ICP备2025058768号-2A',
+                        '滇ICP备2025058768号-3A',
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
