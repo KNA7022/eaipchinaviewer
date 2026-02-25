@@ -813,29 +813,26 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  // 左侧抽屉 - 展开时直接显示，收起时使用动画
+                  // 左侧抽屉
                   ValueListenableBuilder<bool>(
                     valueListenable: _drawerOpenNotifier,
                     builder: (context, isOpen, child) {
-                      return AnimatedContainer(
-                        duration: Duration(milliseconds: isOpen ? 0 : 300),
-                        curve: Curves.easeInOut,
-                        width: isOpen ? _drawerWidth : 0,
-                        child: isOpen ? _buildDrawer() : const SizedBox.shrink(),
-                      );
+                      if (isOpen) {
+                        return SizedBox(
+                          width: _drawerWidth,
+                          child: _buildDrawer(),
+                        );
+                      }
+                      return const SizedBox.shrink();
                     },
                   ),
-                  // 抽屉开关按钮 - 展开时无动画，收起时旋转动画
+                  // 抽屉开关按钮
                   ValueListenableBuilder<bool>(
                     valueListenable: _drawerOpenNotifier,
                     builder: (context, isOpen, child) {
-                      return AnimatedRotation(
-                        duration: Duration(milliseconds: isOpen ? 0 : 300),
-                        turns: isOpen ? 0 : 0.5,
-                        child: IconButton(
-                          icon: Icon(isOpen ? Icons.chevron_left : Icons.chevron_right),
-                          onPressed: _toggleDrawer,
-                        ),
+                      return IconButton(
+                        icon: Icon(isOpen ? Icons.chevron_left : Icons.chevron_right),
+                        onPressed: _toggleDrawer,
                       );
                     },
                   ),
