@@ -59,18 +59,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _calculateCacheSize() async {
     try {
       int totalSize = 0;
-      
+
       // 计算临时目录大小
       final tempDir = await getTemporaryDirectory();
       totalSize += await _getTotalDirectorySize(tempDir);
-      
+
       // 计算应用文档目录大小（PDF缓存可能存储在这里）
       final appDocDir = await getApplicationDocumentsDirectory();
       totalSize += await _getTotalDirectorySize(appDocDir);
-      
+
       // 计算应用缓存目录大小
       final appCacheDir = await getApplicationCacheDirectory();
       totalSize += await _getTotalDirectorySize(appCacheDir);
+
+      // 计算应用支持目录大小
+      final appSupportDir = await getApplicationSupportDirectory();
+      totalSize += await _getTotalDirectorySize(appSupportDir);
+
+      // 计算外部存储目录大小（下载的航图等可能存储在这里）
+      if (Platform.isAndroid) {
+        try {
+          final externalDir = await getExternalStorageDirectory();
+          if (externalDir != null) {
+            totalSize += await _getTotalDirectorySize(externalDir);
+          }
+        } catch (e) {
+          // 某些设备可能不支持获取外部存储目录，忽略错误
+          print('获取外部存储目录失败: $e');
+        }
+      }
 
       setState(() {
         _cacheSize = _formatBytes(totalSize);

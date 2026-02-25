@@ -30,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   final double _drawerWidth = 300.0;
   bool _isDrawerOpen = true;
+  // 使用 ValueNotifier 管理 drawer 状态，避免触发整个页面重建
+  final ValueNotifier<bool> _drawerOpenNotifier = ValueNotifier<bool>(true);
   String? _selectedPdfUrl;
   String? _selectedTitle;
   String _currentVersion = '';
@@ -295,9 +297,8 @@ class _HomeScreenState extends State<HomeScreen> {
       // 使用监听器获取最新的设置值
       final autoCollapse = _themeService.autoCollapseNotifier.value;
       if (autoCollapse) {
-        setState(() {
-          _isDrawerOpen = false;
-        });
+        _drawerOpenNotifier.value = false;
+        _isDrawerOpen = false;
       }
       
       // 等待下一帧再设置新值
@@ -812,16 +813,31 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  // 左侧抽屉
-                  if (_isDrawerOpen)
-                    SizedBox(
-                      width: _drawerWidth,
-                      child: _buildDrawer(),
-                    ),
-                  // 抽屉开关按钮
-                  IconButton(
-                    icon: Icon(_isDrawerOpen ? Icons.chevron_left : Icons.chevron_right),
-                    onPressed: _toggleDrawer,
+                  // 左侧抽屉 - 展开时直接显示，收起时使用动画
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _drawerOpenNotifier,
+                    builder: (context, isOpen, child) {
+                      return AnimatedContainer(
+                        duration: Duration(milliseconds: isOpen ? 0 : 300),
+                        curve: Curves.easeInOut,
+                        width: isOpen ? _drawerWidth : 0,
+                        child: isOpen ? _buildDrawer() : const SizedBox.shrink(),
+                      );
+                    },
+                  ),
+                  // 抽屉开关按钮 - 展开时无动画，收起时旋转动画
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _drawerOpenNotifier,
+                    builder: (context, isOpen, child) {
+                      return AnimatedRotation(
+                        duration: Duration(milliseconds: isOpen ? 0 : 300),
+                        turns: isOpen ? 0 : 0.5,
+                        child: IconButton(
+                          icon: Icon(isOpen ? Icons.chevron_left : Icons.chevron_right),
+                          onPressed: _toggleDrawer,
+                        ),
+                      );
+                    },
                   ),
                   // 右侧主内容区
                   Expanded(
@@ -1476,10 +1492,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _scrollPositions[_currentVersion] = _sidebarScrollController.offset;
       _lastScrollPosition = _sidebarScrollController.offset;
     }
-    
-    final wasOpen = _isDrawerOpen;
-    setState(() => _isDrawerOpen = !_isDrawerOpen);
-    
+
+    final wasOpen = _drawerOpenNotifier.value;
+    _drawerOpenNotifier.value = !wasOpen;
+
+    // 同步更新 _isDrawerOpen 状态
+    _isDrawerOpen = _drawerOpenNotifier.value;
+
     // 如果打开了抽屉，尝试恢复滚动位置
     if (!wasOpen) {
       _lastScrollPosition = _scrollPositions[_currentVersion] ?? 0;
